@@ -45,7 +45,7 @@ class CreateSubmissionsTable extends Migration
             ],
             'submission_date' => [
                 'type' => 'DATETIME',
-                'null' => true, // Changed: Remove CURRENT_TIMESTAMP default
+                'null' => true, 
             ],
             'time_taken' => [
                 'type' => 'INT',

@@ -82,7 +82,7 @@ class CreateQuizzesTable extends Migration
         $this->forge->addForeignKey('lesson_id', 'lessons', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('quizzes');
     }
-
+    
     public function down()
     {
         $this->forge->dropTable('quizzes');

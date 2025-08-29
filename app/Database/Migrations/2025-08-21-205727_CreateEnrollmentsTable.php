@@ -52,7 +52,6 @@ class CreateEnrollmentsTable extends Migration
         $this->forge->addForeignKey('course_id', 'courses', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('enrollments');
     }
-
     public function down()
     {
         $this->forge->dropTable('enrollments');

@@ -11,13 +11,13 @@
   <div class="container-fluid">
      <ul class="nav">
         <li class="nav-item">
-         <a class="nav-link active" href="/">Homepage</a>
+         <a class="nav-link active" href="<?= base_url("/")?>">Homepage</a>
           </li>
           <li class="nav-item">
-             <a class="nav-link" href="/about">About</a>
+             <a class="nav-link" href="<?= base_url("/about")?>">About</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link home" href="/contact">Contact</a>
+            <a class="nav-link home" href="<?= base_url("/contact")?>">Contact</a>
           </li>
      </ul>
   </div>
