@@ -32,7 +32,7 @@ class Auth extends Controller
                     'name'       => $this->request->getPost('name'),
                     'email'      => $this->request->getPost('email'),
                     'password'   => password_hash($this->request->getPost('password'), PASSWORD_DEFAULT),
-                    'role'       => 'user', 
+                    'role'       => 'student', 
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
@@ -52,59 +52,68 @@ class Auth extends Controller
     }
 
     public function login()
-    {
-        helper(['form']);
-        $data = [];
+{
+    helper(['form']);
+    $data = [];
 
-        if ($this->request->is('post')) {
-            $rules = [
-                'email' => 'required|valid_email',
-                'password' => 'required|min_length[6]|max_length[255]'
-            ];
+    if ($this->request->is('post')) {
+        $rules = [
+            'email'    => 'required|valid_email',
+            'password' => 'required|min_length[6]|max_length[255]'
+        ];
 
-            if ($this->validate($rules)) {
-                $email = $this->request->getPost('email');
-                $password = $this->request->getPost('password');
-                
-                $user = $this->builder
-                    ->where('email', $email)
-                    ->get()
-                    ->getRowArray();
+        if ($this->validate($rules)) {
+            $email    = $this->request->getPost('email');
+            $password = $this->request->getPost('password');
+            
+            $user = $this->builder
+                ->where('email', $email)
+                ->get()
+                ->getRowArray();
 
-                if ($user && password_verify($password, $user['password'])) {
-                    session()->set([
-                        'userID'     => $user['id'],
-                        'name'       => $user['name'],
-                        'email'      => $user['email'],
-                        'role'       => $user['role'],
-                        'isLoggedIn' => true
-                    ]);
+            if ($user && password_verify($password, $user['password'])) {
+                session()->set([
+                    'userID'     => $user['id'],
+                    'name'       => $user['name'],
+                    'email'      => $user['email'],
+                    'role'       => $user['role'],
+                    'isLoggedIn' => true    
+                ]);
 
-                    session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
-                    return redirect()->to(base_url('dashboard'));
+                session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
+
+                // ✅ Role-based redirection
+                if ($user['role'] === 'admin') {
+                    return redirect()->to(base_url('admin/dashboard'));
+                } elseif ($user['role'] === 'teacher') {
+                    return redirect()->to(base_url('teacher/dashboard'));
+                } elseif ($user['role'] === 'student') {
+                    return redirect()->to(base_url('student/dashboard'));
                 } else {
-                    session()->setFlashdata('error', 'Invalid email or password.');
+                    // fallback in case of unknown role
+                    return redirect()->to(base_url('dashboard'));
                 }
+
             } else {
-                $data['validation'] = $this->validator;
+                session()->setFlashdata('error', 'Invalid email or password.');
             }
+        } else {
+            $data['validation'] = $this->validator;
         }
-
-        return view('auth/login', $data);
     }
 
-    public function logout()
-    {
-        session()->destroy();
-        return redirect()->to(base_url('login'));
-    }
+    return view('auth/login', $data);
+}
+public function logout()
+{
+    // Destroy all session data
+    session()->destroy();
 
-    public function dashboard()
-    {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to(base_url('login'));
-        }
-        
-        return view('auth/dashboard');
-    }
+    // Optional: Add a flash message
+    session()->setFlashdata('success', 'You have been logged out successfully.');
+
+    // Redirect to login page
+    return redirect()->to(base_url('login'));
+}
+
 }

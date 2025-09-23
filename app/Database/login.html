@@ -5,22 +5,135 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Page</title>
     <link rel="stylesheet" href="login.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-form {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+        }
+        .login-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .login-header:after {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #4285f4, transparent);
+            bottom: -5px;
+            left: 25%;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        .icon-input {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .input-icon {
+            margin-right: 10px;
+            color: #666;
+        }
+        input[type="email"],
+        input[type="password"] {
+            border: none;
+            outline: none;
+            flex: 1;
+            padding: 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        input[type="email"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #bbb;
+        }
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .remember-me {
+            font-size: 14px;
+            color: #333;
+        }
+        .forgot-link {
+            font-size: 14px;
+            color: #4285f4;
+            text-decoration: none;
+        }
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            background-color: #4285f4;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .login-btn:hover {
+            background-color: #357ae8;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="login-form">
+            <div class="login-header">
+                CUSTOMER LOGIN
+            </div>
             <form action="#" method="POST">
-                <div class="form-group">
-                    <label for="email">Usernames:</label>
-                    <input type="email" id="email" name="email" required>
+                <div class="form-group icon-input">
+                    <span class="input-icon">
+                        <!-- Email SVG -->
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-5.857 3.514a2 2 0 0 1-2.286 0L1 5.383V12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5.383z"/></svg>
+                    </span>
+                    <input type="email" id="email" name="email" placeholder="Email ID" required>
                 </div>
-                
-                <div class="form-group">
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
+                <div class="form-group icon-input">
+                    <span class="input-icon">
+                        <!-- Lock SVG -->
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 1a4 4 0 0 1 4 4v2h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1V5a4 4 0 0 1 4-4zm3 6V5a3 3 0 0 0-6 0v2h6zm-7 1v7h10V8H4zm5 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+                    </span>
+                    <input type="password" id="password" name="password" placeholder="Password" required>
                 </div>
-                
-                <button type="submit" class="login-btn">Login</button>
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" name="remember"> Remember me
+                    </label>
+                    <a href="#" class="forgot-link">Forgot Password?</a>
+                </div>
+                <button type="submit" class="login-btn">LOGIN</button>
             </form>
         </div>
     </div>

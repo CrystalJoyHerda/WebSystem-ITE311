@@ -5,9 +5,9 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-    height: 100vh;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(ellipse at top left, #1a2a3a 0%, #16222a 100%);
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -15,91 +15,156 @@ body {
 
 .container {
     width: 100%;
-    max-width: 400px;
-    padding: 20px;
+    max-width: 370px;
+    padding: 0;
+    background: rgba(20, 40, 60, 0.85);
+    border-radius: 22px;
+    box-shadow: 0 12px 40px 0 rgba(31,38,135,0.25);
+    border: 1.5px solid #43c6e7;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .login-form {
-    background-color: white;
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background: transparent;
+    border-radius: 22px;
+    box-shadow: none;
+    text-align: center;
+    position: relative;
+    padding: 0 32px 32px 32px;
+}
+
+.login-header {
+    background: linear-gradient(90deg, #43e7c6 0%, #43c6e7 100%);
+    color: #1a2a3a;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    border-radius: 22px 22px 0 0;
+    padding: 28px 0 18px 0;
+    margin-bottom: 32px;
     text-align: center;
 }
 
 .form-group {
-    margin-bottom: 25px;
+    margin-bottom: 28px;
+    position: relative;
     text-align: left;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 16px;
-    color: #333;
-    font-weight: 500;
+.icon-input .input-icon {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #43c6e7;
+    pointer-events: none;
 }
 
-.form-group input {
+.icon-input input {
     width: 100%;
-    padding: 15px 20px;
-    border: 2px solid #e0e0e0;
-    border-radius: 25px;
-    font-size: 16px;
+    padding: 12px 0 12px 36px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #43c6e7;
+    font-size: 1rem;
+    color: #fff;
     outline: none;
-    transition: border-color 0.3s ease;
-    background-color: #f8f9fa;
+    transition: border-color 0.3s;
 }
 
-.form-group input:focus {
-    border-color: #4285f4;
-    background-color: white;
+.icon-input input:focus {
+    border-bottom: 2.5px solid #43e7c6;
+}
+
+.icon-input input::placeholder {
+    color: #b2eaf7;
+    opacity: 1;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    font-size: 0.95rem;
+}
+
+.remember-me {
+    color: #b2eaf7;
+    font-size: 0.95rem;
+}
+
+.remember-me input[type="checkbox"] {
+    accent-color: #43c6e7;
+    margin-right: 6px;
+}
+
+.forgot-link {
+    color: #b2eaf7;
+    text-decoration: none;
+    font-style: italic;
+    transition: color 0.2s;
+}
+
+.forgot-link:hover {
+    color: #43e7c6;
+    text-decoration: underline;
 }
 
 .login-btn {
     width: 100%;
-    padding: 15px;
-    background-color: #4285f4;
-    color: white;
+    padding: 14px 0;
+    background: linear-gradient(90deg, #43e7c6 0%, #43c6e7 100%);
+    color: #1a2a3a;
     border: none;
-    border-radius: 25px;
-    font-size: 16px;
+    border-radius: 12px;
+    font-size: 1.1rem;
     font-weight: 600;
+    letter-spacing: 2px;
     cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    margin-top: 10px;
+    box-shadow: 0 2px 12px rgba(67,198,231,0.15);
+    transition: background 0.3s, transform 0.2s;
+    margin-top: 8px;
 }
 
 .login-btn:hover {
-    background-color: #3367d6;
-    transform: translateY(-1px);
-}
-
-.login-btn:active {
-    transform: translateY(0);
+    background: linear-gradient(90deg, #43c6e7 0%, #43e7c6 100%);
+    transform: translateY(-2px) scale(1.03);
 }
 
 /* Responsive design */
 @media (max-width: 480px) {
     .container {
-        padding: 10px;
+        max-width: 98vw;
+        border-radius: 12px;
     }
-    
     .login-form {
-        padding: 30px 20px;
+        padding: 0 10px 18px 10px;
+        border-radius: 12px;
     }
-    
-    .form-group label {
-        font-size: 14px;
+    .login-header {
+        font-size: 1.1rem;
+        padding: 18px 0 10px 0;
+        border-radius: 12px 12px 0 0;
+        margin-bottom: 18px;
     }
-    
-    .form-group input {
-        padding: 12px 18px;
-        font-size: 14px;
+    .form-group {
+        margin-bottom: 18px;
     }
-    
     .login-btn {
-        padding: 12px;
-        font-size: 14px;
+        padding: 10px 0;
+        font-size: 1rem;
     }
+}
+
+/* Add a subtle fade-in animation */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px);}
+    to { opacity: 1; transform: translateY(0);}
+}
+.login-form {
+    animation: fadeInUp 0.7s cubic-bezier(.39,.575,.565,1) both;
 }
