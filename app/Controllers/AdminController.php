@@ -12,10 +12,15 @@ class AdminController extends Controller
             return redirect()->to(base_url('login'));
         }
 
-        // Prepare data (example: list of admin users)
         $db = \Config\Database::connect();
+        $totalUsers = $db->table('users')->countAllResults();
+
+        // Prepare data (example: list of admin users)
         $admins = $db->table('users')->where('role', 'admin')->get()->getResultArray();
 
-        return view('admin/dashboard', ['admins' => $admins]);
+        return view('admin/dashboard', [
+            'admins' => $admins,
+            'totalUsers' => $totalUsers,
+        ]);
     }
 }
