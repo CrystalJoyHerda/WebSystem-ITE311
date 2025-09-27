@@ -84,11 +84,11 @@ class Auth extends Controller
 
                 // ✅ Role-based redirection
                 if ($user['role'] === 'admin') {
-                    return redirect()->to(base_url('admin/dashboard'));
+                    return redirect()->to(base_url('auth/dashboard'));
                 } elseif ($user['role'] === 'teacher') {
-                    return redirect()->to(base_url('teacher/dashboard'));
+                    return redirect()->to(base_url('auth/dashboard'));
                 } elseif ($user['role'] === 'student') {
-                    return redirect()->to(base_url('student/dashboard'));
+                    return redirect()->to(base_url('auth/dashboard'));
                 } else {
                     // fallback in case of unknown role
                     return redirect()->to(base_url('dashboard'));
@@ -115,5 +115,43 @@ public function logout()
     // Redirect to login page
     return redirect()->to(base_url('login'));
 }
+public function dashboard()
+{
+    if (!session()->get('isLoggedIn')) {
+        return redirect()->to(base_url('login'));
+    }
 
+    $role = session()->get('role');
+    $db = \Config\Database::connect();
+
+    if ($role === 'admin') {
+        $totalUsers = $db->table('users')->countAllResults();
+        $totalCourses = $db->table('courses')->countAllResults();
+
+        return view('auth/dashboard', [
+            'totalUsers' => $totalUsers,
+            'totalCourses' => $totalCourses
+        ]);
+    } elseif ($role === 'teacher') {
+        // Example: get courses for teacher
+        $courses = $db->table('courses')->where('teacher_id', session()->get('userID'))->get()->getResultArray();
+
+        return view('auth/dashboard', [
+            'courses' => $courses
+        ]);
+    } elseif ($role === 'student') {
+        // Example: get enrolled courses for student
+        $courses = $db->table('enrollments')
+            ->select('courses.name')
+            ->join('courses', 'courses.id = enrollments.course_id')
+            ->where('enrollments.student_id', session()->get('userID'))
+            ->get()->getResultArray();
+
+        return view('auth/dashboard', [
+            'courses' => $courses
+        ]);
+    } else {
+        return redirect()->to(base_url('login'));
+    }
+}
 }

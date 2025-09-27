@@ -17,9 +17,9 @@ $routes->post('/login', 'Auth::login');
 $routes->get('/logout', 'Auth::logout');
 
 // Role-based dashboards
-$routes->get('/admin/dashboard', 'AdminController::dashboard');
-$routes->get('/teacher/dashboard', 'TeacherController::dashboard');
-$routes->get('/student/dashboard', 'StudentController::dashboard');
+$routes->get('/auth/dashboard', 'Auth::dashboard');
+$routes->get('/auth/dashboard', 'Auth::dashboard');
+$routes->get('/auth/dashboard', 'Auth::dashboard');
 
 // Fallback generic dashboard (if needed)
 $routes->get('/dashboard', 'Auth::dashboard');
