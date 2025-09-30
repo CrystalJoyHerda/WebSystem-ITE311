@@ -117,6 +117,7 @@ public function logout()
 }
 public function dashboard()
 {
+    // Authorization check
     if (!session()->get('isLoggedIn')) {
         return redirect()->to(base_url('login'));
     }
@@ -124,34 +125,35 @@ public function dashboard()
     $role = session()->get('role');
     $db = \Config\Database::connect();
 
+    $data = [
+        'role' => $role,
+        'name' => session()->get('name')
+    ];
+
     if ($role === 'admin') {
-        $totalUsers = $db->table('users')->countAllResults();
-        $totalCourses = $db->table('courses')->countAllResults();
+        $data['totalUsers']   = $db->table('users')->countAllResults();
+        $data['totalCourses'] = $db->table('courses')->countAllResults();
+        $data['users'] = $db->table('users')->get()->getResultArray();
 
-        return view('auth/dashboard', [
-            'totalUsers' => $totalUsers,
-            'totalCourses' => $totalCourses
-        ]);
     } elseif ($role === 'teacher') {
-        // Example: get courses for teacher
-        $courses = $db->table('courses')->where('teacher_id', session()->get('userID'))->get()->getResultArray();
+        // Make sure the column name matches your DB (e.g., 'instructor_id' or 'teacher_id')
+        $data['courses'] = $db->table('courses')
+            ->where('instructor_id', session()->get('userID'))
+            ->get()
+            ->getResultArray();
 
-        return view('auth/dashboard', [
-            'courses' => $courses
-        ]);
     } elseif ($role === 'student') {
-        // Example: get enrolled courses for student
-        $courses = $db->table('enrollments')
-            ->select('courses.name')
-            ->join('courses', 'courses.id = enrollments.course_id')
+        // Make sure the join and select match your DB structure
+        $data['courses'] = $db->table('enrollments')
+            ->select('course_name')
+            ->join('courses', 'course_id = enrollments.course_id')
             ->where('enrollments.student_id', session()->get('userID'))
-            ->get()->getResultArray();
-
-        return view('auth/dashboard', [
-            'courses' => $courses
-        ]);
-    } else {
-        return redirect()->to(base_url('login'));
+            ->get()
+            ->getResultArray();
     }
+    $data['coursesList'] = $db->table('courses')->get()->getResultArray();
+
+    return view('auth/dashboard', $data);
 }
+
 }

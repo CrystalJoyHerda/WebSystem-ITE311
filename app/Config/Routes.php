@@ -18,8 +18,6 @@ $routes->get('/logout', 'Auth::logout');
 
 // Role-based dashboards
 $routes->get('/auth/dashboard', 'Auth::dashboard');
-$routes->get('/auth/dashboard', 'Auth::dashboard');
-$routes->get('/auth/dashboard', 'Auth::dashboard');
 
 // Fallback generic dashboard (if needed)
 $routes->get('/dashboard', 'Auth::dashboard');
