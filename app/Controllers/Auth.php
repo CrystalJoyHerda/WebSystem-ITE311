@@ -83,15 +83,15 @@ class Auth extends Controller
                 session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
 
                 // ✅ Role-based redirection
-                if ($user['role'] === 'admin') {
-                    return redirect()->to(base_url('auth/dashboard'));
-                } elseif ($user['role'] === 'teacher') {
-                    return redirect()->to(base_url('auth/dashboard'));
-                } elseif ($user['role'] === 'student') {
-                    return redirect()->to(base_url('auth/dashboard'));
+                $role = session('role');
+                if ($role === 'admin') {
+                    return redirect()->to(base_url('admin/dashboard'));
+                } elseif ($role === 'teacher') {
+                    return redirect()->to(base_url('teacher/dashboard'));
+                } elseif ($role === 'student') {
+                    return redirect()->to(base_url('student/dashboard'));
                 } else {
-                    // fallback in case of unknown role
-                    return redirect()->to(base_url('dashboard'));
+                    return redirect()->to(base_url('/'));
                 }
 
             } else {
@@ -143,13 +143,25 @@ public function dashboard()
             ->getResultArray();
 
     } elseif ($role === 'student') {
-        // Make sure the join and select match your DB structure
-        $data['courses'] = $db->table('enrollments')
-            ->select('course_name')
-            ->join('courses', 'course_id = enrollments.course_id')
-            ->where('enrollments.student_id', session()->get('userID'))
+        // Get enrolled courses with details
+        $data['enrolledCourses'] = $db->table('enrollments')
+            ->select('courses.id, courses.course_name as name, courses.description, enrollments.enrollment_date')
+            ->join('courses', 'courses.id = enrollments.course_id')
+            ->where('enrollments.user_id', session()->get('userID'))
             ->get()
             ->getResultArray();
+
+        // Get available courses (not enrolled)
+        $enrolledCourseIds = array_column($data['enrolledCourses'], 'id');
+        if (empty($enrolledCourseIds)) {
+            $data['availableCourses'] = $db->table('courses')->select('id, course_name as name, description')->get()->getResultArray();
+        } else {
+            $data['availableCourses'] = $db->table('courses')
+                ->select('id, course_name as name, description')
+                ->whereNotIn('id', $enrolledCourseIds)
+                ->get()
+                ->getResultArray();
+        }
     }
     $data['coursesList'] = $db->table('courses')->get()->getResultArray();
 

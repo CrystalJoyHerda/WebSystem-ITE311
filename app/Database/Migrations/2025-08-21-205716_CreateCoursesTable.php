@@ -33,19 +33,9 @@ class CreateCoursesTable extends Migration
                 'unsigned' => true,
                 'null' => true,
             ],
-            'units' => [
-                'type' => 'INT',
-                'constraint' => 2,
-                'default' => 3,
-            ],
             'semester' => [
                 'type' => 'VARCHAR',
                 'constraint' => 20,
-                'null' => true,
-            ],
-            'academic_year' => [
-                'type' => 'VARCHAR',
-                'constraint' => 10,
                 'null' => true,
             ],
             'created_at' => [
