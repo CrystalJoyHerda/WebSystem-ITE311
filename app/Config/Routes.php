@@ -25,3 +25,21 @@ $routes->get('student/dashboard', 'Auth::dashboard');
 // Fallback generic dashboard (if needed)
 $routes->get('/dashboard', 'Auth::dashboard');
 $routes->post('/course/enroll', 'Course::enroll');
+
+// Admin dashboard (maps /admin to your Auth::dashboard)
+$routes->get('admin', 'Auth::dashboard');
+
+// Admin courses page (map to dashboard or change to the correct controller/method if you have one)
+$routes->get('admin/courses', 'Auth::dashboard');
+
+// Materials routes
+$routes->get('admin/course/(:num)/upload', 'Materials::upload/$1');
+$routes->post('admin/course/(:num)/upload', 'Materials::upload/$1');
+
+$routes->get('materials/delete/(:num)', 'Materials::delete/$1');
+$routes->get('materials/download/(:num)', 'Materials::download/$1');
+
+//Announcement routes
+$routes->get('announcements', 'Announcement::index');
+$routes->get('announcement', 'Announcement::index');
+

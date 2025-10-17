@@ -134,20 +134,43 @@ public function dashboard()
         $data['totalUsers']   = $db->table('users')->countAllResults();
         $data['totalCourses'] = $db->table('courses')->countAllResults();
         $data['users'] = $db->table('users')->get()->getResultArray();
-
+        $data['coursesList'] = $db->table('courses')
+            ->select('id, course_name AS name, description')
+            ->get()
+            ->getResultArray();
     } elseif ($role === 'teacher') {
-        // Make sure the column name matches your DB (e.g., 'instructor_id' or 'teacher_id')
         $data['courses'] = $db->table('courses')
+            ->select('id, course_name AS name, description')
             ->where('instructor_id', session()->get('userID'))
             ->get()
             ->getResultArray();
-
     } elseif ($role === 'student') {
+        // Detect the enrollments table user/student column dynamically
+        $fields = $db->getFieldData('enrollments'); // returns array of field objects
+        $fieldNames = array_map(function($f){ return $f->name; }, $fields);
+
+        $candidates = ['user_id', 'student_id', 'userID', 'userid', 'studentid', 'studentID'];
+        $enrollmentUserCol = null;
+        foreach ($candidates as $cand) {
+            // case-insensitive check against real column names
+            foreach ($fieldNames as $fn) {
+                if (strcasecmp($fn, $cand) === 0) {
+                    $enrollmentUserCol = $fn; // use actual column name from DB
+                    break 2;
+                }
+            }
+        }
+
+        if (! $enrollmentUserCol) {
+            // Fail early with a clear message for development environment
+            throw new \RuntimeException("enrollments table is missing a user/student foreign-key column. Checked: " . implode(', ', $candidates));
+        }
+
         // Get enrolled courses with details
         $data['enrolledCourses'] = $db->table('enrollments')
             ->select('courses.id, courses.course_name as name, courses.description, enrollments.enrollment_date')
             ->join('courses', 'courses.id = enrollments.course_id')
-            ->where('enrollments.user_id', session()->get('userID'))
+            ->where("enrollments.{$enrollmentUserCol}", session()->get('userID'))
             ->get()
             ->getResultArray();
 

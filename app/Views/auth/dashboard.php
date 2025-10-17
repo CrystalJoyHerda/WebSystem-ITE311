@@ -9,7 +9,7 @@
         body { background: #f8f9fa; }
         .card { border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.03);}
         .table { margin-bottom: 0; }
-        .dashboard-title { font-weight: 600; letter-spacing: .5px; }
+        .dashboard-title { font-weight: 600, letter-spacing: .5px; }
         .modal-content { border-radius: 10px; }
         .btn, .form-control, .form-select { border-radius: 6px; }
         .list-unstyled li { padding: 2px 0; }
@@ -169,18 +169,35 @@
                             <tr>
                               <th>Course Name</th>
                               <th>Description</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            <?php if (!empty($coursesList)): foreach ($coursesList as $course): ?>
-                              <tr>
-                                <td><?= esc($course['name'] ?? $course['title'] ?? 'Unnamed Course') ?></td>
-                                <td><?= esc($course['description'] ?? '') ?></td>
-                              </tr>
-                            <?php endforeach; else: ?>
-                              <tr>
-                                <td colspan="2" class="text-muted text-center">No courses found.</td>
-                              </tr>
+                          <?php
+    // Ensure $adminCourses is always defined to prevent "undefined variable" errors
+                              $adminCourses = isset($coursesList)
+                              ? $coursesList
+                            : (isset($courses) ? $courses : []);
+
+                               if (!empty($adminCourses)):
+                                 ?>
+                                   <?php foreach ($adminCourses as $course): ?>
+
+                                    <tr>
+                                        <td><?= esc($course['name'] ?? $course['course_name'] ?? $course['title'] ?? 'Unnamed Course') ?></td>
+                                        <td><?= esc($course['description'] ?? '') ?></td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               href="<?= base_url('admin/course/' . intval($course['id']) . '/upload') ?>">
+                                               Manage Materials
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="3" class="text-muted text-center">No courses assigned.</td>
+                                </tr>
                             <?php endif; ?>
                           </tbody>
                         </table>
@@ -198,7 +215,13 @@
                     <ul class="list-unstyled mb-0">
                         <?php if (!empty($courses)): ?>
                             <?php foreach ($courses as $course): ?>
-                                <li><?= esc($course['name'] ?? $course['title'] ?? 'Unnamed Course') ?></li>
+                                <li class="d-flex justify-content-between align-items-center mb-1">
+                                    <span><?= esc($course['name'] ?? $course['title'] ?? 'Unnamed Course') ?></span>
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       href="<?= base_url('admin/course/'.intval($course['id']).'/upload') ?>">
+                                       Materials
+                                    </a>
+                                </li>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <li class="text-muted">No courses assigned.</li>

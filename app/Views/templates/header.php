@@ -31,23 +31,41 @@
             <i class="fa fa-home me-1"></i>Dashboard
           </a>
         </li>
+
         <?php if ($role === 'admin'): ?>
           <li class="nav-item">
             <a class="nav-link<?= service('uri')->getSegment(2) === 'users' ? ' active' : '' ?>" href="<?= base_url('admin/users') ?>" style="font-size:1.15rem;">
               <i class="fa fa-users me-1"></i>Users
             </a>
           </li>
+
           <li class="nav-item">
             <a class="nav-link<?= service('uri')->getSegment(2) === 'courses' ? ' active' : '' ?>" href="<?= base_url('admin/courses') ?>" style="font-size:1.15rem;">
               <i class="fa fa-book me-1"></i>Courses
             </a>
           </li>
+
+          <!-- Announcements button to the right of Courses (admin only) -->
+          <li class="nav-item">
+            <a href="<?= base_url('announcement') ?>" class="btn btn-sm btn-outline-primary ms-2" style="font-size:1.05rem;">
+              <i class="fa fa-bullhorn me-1"></i>Announcements
+            </a>
+          </li>
+
         <?php elseif ($role === 'teacher'): ?>
           <li class="nav-item">
             <a class="nav-link<?= service('uri')->getSegment(2) === 'courses' ? ' active' : '' ?>" href="<?= base_url('teacher/courses') ?>" style="font-size:1.15rem;">
               <i class="fa fa-book me-1"></i>My Courses
             </a>
           </li>
+
+          <!-- Announcements button to the right of Courses (teacher only) -->
+          <li class="nav-item">
+            <a href="<?= base_url('announcement') ?>" class="btn btn-sm btn-outline-primary ms-2" style="font-size:1.05rem;">
+              <i class="fa fa-bullhorn me-1"></i>Announcements
+            </a>
+          </li>
+
         <?php elseif ($role === 'student'): ?>
           <li class="nav-item">
             <a class="nav-link<?= service('uri')->getSegment(2) === 'courses' ? ' active' : '' ?>" href="<?= base_url('student/courses') ?>" style="font-size:1.15rem;">
