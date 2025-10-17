@@ -79,9 +79,7 @@
             <div class="login-header">
                 Login
             </div>
-            <?php if (session()->getFlashdata('success')): ?>
-                <div class="alert alert-success text-center"><?= session()->getFlashdata('success') ?></div>
-            <?php endif; ?>
+            <!-- success flash removed to avoid showing welcome on the login page -->
             <?php if (session()->getFlashdata('error')): ?>
                 <div class="alert alert-danger text-center"><?= session()->getFlashdata('error') ?></div>
             <?php endif; ?>

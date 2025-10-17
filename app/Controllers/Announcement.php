@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controllers;
 
 use App\Models\AnnouncementModel;
@@ -18,4 +17,5 @@ class Announcement extends BaseController
         return view('announcement', $data);
     }
 
+    // ...existing controller methods (if any)...
 }

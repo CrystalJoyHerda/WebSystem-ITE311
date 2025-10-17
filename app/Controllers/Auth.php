@@ -79,6 +79,8 @@ class Auth extends Controller
                     'role'       => $user['role'],
                     'isLoggedIn' => true    
                 ]);
+                // after session()->set([...])
+log_message('debug', 'Auth session: ' . json_encode(session()->get()));
 
                 session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
 

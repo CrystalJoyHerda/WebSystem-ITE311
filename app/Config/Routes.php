@@ -16,25 +16,25 @@ $routes->get('/login', 'Auth::login');
 $routes->post('/login', 'Auth::login');
 $routes->get('/logout', 'Auth::logout');
 
-// Role-based dashboards
-$routes->get('/auth/dashboard', 'Auth::dashboard');
-$routes->get('admin/dashboard', 'Admin::dashboard');
-$routes->get('teacher/dashboard', 'Teacher::dashboard');
+// Role-based dashboards (grouped and protected)
+$routes->group('admin', ['filter' => 'roleauth'], function($routes){
+    $routes->get('dashboard', 'Admin::dashboard'); // /admin/dashboard
+    // add other admin routes here (e.g. $routes->get('users', 'Admin::users'); )
+});
+
+$routes->group('teacher', ['filter' => 'roleauth'], function($routes){
+    $routes->get('dashboard', 'Teacher::dashboard'); // /teacher/dashboard
+    // add other teacher routes here
+});
+
+// student/dashboard can be left ungrouped or grouped similarly if needed
 $routes->get('student/dashboard', 'Auth::dashboard');
 
-// Fallback generic dashboard (if needed)
-$routes->get('/dashboard', 'Auth::dashboard');
-$routes->post('/course/enroll', 'Course::enroll');
+// announcements (public / student-accessible)
+$routes->get('announcement', 'Announcement::index');
+$routes->get('announcements', 'Announcement::index'); // pick one name and use it consistently
 
-// Admin dashboard (maps /admin to your Auth::dashboard)
-$routes->get('admin', 'Auth::dashboard');
-
-// Admin courses page (map to dashboard or change to the correct controller/method if you have one)
-$routes->get('admin/courses', 'Auth::dashboard');
-
-// Materials routes
-$routes->get('admin/course/(:num)/upload', 'Materials::upload/$1');
-$routes->post('admin/course/(:num)/upload', 'Materials::upload/$1');
-
-$routes->get('materials/delete/(:num)', 'Materials::delete/$1');
-$routes->get('materials/download/(:num)', 'Materials::download/$1');
+// Log the auth session after login
+$routes->post('/login', function(){
+    log_message('debug', 'Auth session after login: ' . json_encode(session()->get()));
+});

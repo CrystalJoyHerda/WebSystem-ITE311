@@ -27,5 +27,10 @@
             <li>No announcements found.</li>
         <?php endif; ?>
     </ul>
+    <?php if (session()->getFlashdata('error')): ?>
+        <div class="alert alert-danger">
+            <?= esc(session()->getFlashdata('error')) ?>
+        </div>
+    <?php endif; ?>
 </body>
 </html>
