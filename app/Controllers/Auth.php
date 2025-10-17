@@ -89,7 +89,8 @@ class Auth extends Controller
                 } elseif ($role === 'teacher') {
                     return redirect()->to(base_url('teacher/dashboard'));
                 } elseif ($role === 'student') {
-                    return redirect()->to(base_url('student/dashboard'));
+                    // students go to announcements page
+                    return redirect()->to(base_url('announcement'));
                 } else {
                     return redirect()->to(base_url('/'));
                 }

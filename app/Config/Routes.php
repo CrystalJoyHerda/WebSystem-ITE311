@@ -18,8 +18,8 @@ $routes->get('/logout', 'Auth::logout');
 
 // Role-based dashboards
 $routes->get('/auth/dashboard', 'Auth::dashboard');
-$routes->get('admin/dashboard', 'Auth::dashboard');
-$routes->get('teacher/dashboard', 'Auth::dashboard');
+$routes->get('admin/dashboard', 'Admin::dashboard');
+$routes->get('teacher/dashboard', 'Teacher::dashboard');
 $routes->get('student/dashboard', 'Auth::dashboard');
 
 // Fallback generic dashboard (if needed)
@@ -38,8 +38,3 @@ $routes->post('admin/course/(:num)/upload', 'Materials::upload/$1');
 
 $routes->get('materials/delete/(:num)', 'Materials::delete/$1');
 $routes->get('materials/download/(:num)', 'Materials::download/$1');
-
-//Announcement routes
-$routes->get('announcements', 'Announcement::index');
-$routes->get('announcement', 'Announcement::index');
-
