@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm mb-4" style="font-size:1.15rem;">
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top" style="font-size:1.15rem; z-index: 1030;">
   <div class="container">
     <?php
       $role = session('role');

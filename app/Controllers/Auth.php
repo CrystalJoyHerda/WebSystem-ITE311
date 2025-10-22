@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 use CodeIgniter\Controller;
+use App\Models\MaterialModel;
 
 class Auth extends Controller
 {
@@ -84,18 +85,8 @@ log_message('debug', 'Auth session: ' . json_encode(session()->get()));
 
                 session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
 
-                // ✅ Role-based redirection
-                $role = session('role');
-                if ($role === 'admin') {
-                    return redirect()->to(base_url('admin/dashboard'));
-                } elseif ($role === 'teacher') {
-                    return redirect()->to(base_url('teacher/dashboard'));
-                } elseif ($role === 'student') {
-                    // students go to announcements page
-                    return redirect()->to(base_url('announcement'));
-                } else {
-                    return redirect()->to(base_url('/'));
-                }
+                // Redirect all authenticated users to the unified dashboard view
+                return redirect()->to(base_url('student/dashboard'));
 
             } else {
                 session()->setFlashdata('error', 'Invalid email or password.');
@@ -179,14 +170,29 @@ public function dashboard()
 
         // Get available courses (not enrolled)
         $enrolledCourseIds = array_column($data['enrolledCourses'], 'id');
-        if (empty($enrolledCourseIds)) {
-            $data['availableCourses'] = $db->table('courses')->select('id, course_name as name, description')->get()->getResultArray();
-        } else {
+        log_message('debug', 'Auth::dashboard detected enrollment column: ' . $enrollmentUserCol . ' enrolled_count: ' . count($enrolledCourseIds));
+
+        if (! empty($enrolledCourseIds)) {
+            // Fetch materials for enrolled courses
+            $materialModel = new MaterialModel();
+            $materials = $materialModel->whereIn('course_id', $enrolledCourseIds)
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+
+            // Group materials by course_id for easy rendering
+            $courseMaterials = [];
+            foreach ($materials as $m) {
+                $courseMaterials[intval($m['course_id'])][] = $m;
+            }
+            $data['courseMaterials'] = $courseMaterials;
             $data['availableCourses'] = $db->table('courses')
                 ->select('id, course_name as name, description')
                 ->whereNotIn('id', $enrolledCourseIds)
                 ->get()
                 ->getResultArray();
+        } else {
+            $data['courseMaterials'] = [];
+            $data['availableCourses'] = $db->table('courses')->select('id, course_name as name, description')->get()->getResultArray();
         }
     }
     $data['coursesList'] = $db->table('courses')->get()->getResultArray();

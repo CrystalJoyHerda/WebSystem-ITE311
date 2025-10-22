@@ -18,7 +18,7 @@
 <body>
 <?= view('templates/header') ?>
 
-<div class="container py-5">
+<div class="container py-5" style="padding-top:calc(70px + 1rem);">
     <div class="row g-4">
         <!-- Recent Activity -->
         <div class="col-lg-8 col-md-12">
@@ -187,10 +187,11 @@
                                         <td><?= esc($course['name'] ?? $course['course_name'] ?? $course['title'] ?? 'Unnamed Course') ?></td>
                                         <td><?= esc($course['description'] ?? '') ?></td>
                                         <td>
-                                            <a class="btn btn-sm btn-outline-primary"
-                                               href="<?= base_url('admin/course/' . intval($course['id']) . '/upload') ?>">
-                                               Manage Materials
-                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-primary view-materials-btn"
+                                                data-course-id="<?= intval($course['id']) ?>"
+                                                data-course-name="<?= esc($course['name'] ?? $course['title'] ?? 'Course') ?>">
+                                                View Materials
+                                            </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -215,12 +216,24 @@
                     <ul class="list-unstyled mb-0">
                         <?php if (!empty($courses)): ?>
                             <?php foreach ($courses as $course): ?>
+                                <?php
+                                    $enrollDate = '';
+                                    if (!empty($course['enrollment_date'])) {
+                                        $ts = strtotime($course['enrollment_date']);
+                                        if ($ts !== false) {
+                                            $enrollDate = date('M d, Y', $ts);
+                                        }
+                                    }
+                                ?>
                                 <li class="d-flex justify-content-between align-items-center mb-1">
-                                    <span><?= esc($course['name'] ?? $course['title'] ?? 'Unnamed Course') ?></span>
-                                    <a class="btn btn-sm btn-outline-primary"
-                                       href="<?= base_url('admin/course/'.intval($course['id']).'/upload') ?>">
-                                       Materials
+                                    <a href="#" class="view-materials-link" data-course-id="<?= intval($course['id']) ?>" data-course-name="<?= esc($course['name']) ?>">
+                                        <?= esc($course['name']) ?>
                                     </a>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <?php if ($enrollDate !== ''): ?>
+                                            <span class="badge bg-primary"><?= esc($enrollDate) ?></span>
+                                        <?php endif; ?>
+                                    </div>
                                 </li>
                             <?php endforeach; ?>
                         <?php else: ?>
@@ -275,13 +288,17 @@
                         <ul class="list-group mb-3">
                             <?php foreach ($enrolledCourses as $course): ?>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>
-                                        <?= esc($course['name']) ?>
+                                    <div>
+                                        <a href="#" class="view-materials-link fw-bold" data-course-id="<?= intval($course['id']) ?>" data-course-name="<?= esc($course['name']) ?>">
+                                            <?= esc($course['name']) ?>
+                                        </a>
                                         <?php if (!empty($course['description'])): ?>
-                                            <small class="text-muted d-block"><?= esc($course['description']) ?></small>
+                                            <div class="text-muted small"><?= esc($course['description']) ?></div>
                                         <?php endif; ?>
-                                    </span>
-                                    <span class="badge bg-primary"><?= date('M d, Y', strtotime($course['enrollment_date'])) ?></span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-primary"><?= date('M d, Y', strtotime($course['enrollment_date'])) ?></span>
+                                    </div>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
@@ -290,7 +307,7 @@
                     <?php endif; ?>
                 </div>
 
-                <!-- Available Courses Card -->
+        <!-- Available Courses Card -->
                 <div class="card mb-3 p-3">
                     <div class="d-flex align-items-center mb-2">
                         <i class="fa fa-book-open text-secondary me-2"></i>
@@ -316,9 +333,80 @@
                         <div class="text-muted">No available courses to enroll.</div>
                     <?php endif; ?>
                 </div>
+        <!-- Course Materials Card -->
+        <div class="card mb-3 p-3">
+          <div class="d-flex align-items-center mb-2">
+            <i class="fa fa-file-download text-info me-2"></i>
+            <span>Course Materials</span>
+          </div>
+          <?php if (!empty($courseMaterials)): ?>
+            <?php foreach ($courseMaterials as $courseId => $materials): ?>
+              <div class="mb-3">
+                <?php
+                  // try to get course name from enrolledCourses
+                  $courseName = 'Course ' . intval($courseId);
+                  if (!empty($enrolledCourses)) {
+                    foreach ($enrolledCourses as $c) {
+                      if (intval($c['id']) === intval($courseId)) {
+                        $courseName = $c['name'];
+                        break;
+                      }
+                    }
+                  }
+                ?>
+                <h6 class="mb-2"><?= esc($courseName) ?></h6>
+                <ul class="list-group">
+                  <?php foreach ($materials as $m): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong><?= esc($m['file_name']) ?></strong>
+                        <?php if (!empty($m['created_at'])): ?>
+                          <div class="text-muted small">Uploaded: <?= date('M d, Y', strtotime($m['created_at'])) ?></div>
+                        <?php endif; ?>
+                      </div>
+                      <div>
+                        <a class="btn btn-sm btn-outline-primary" href="<?= base_url('materials/download/' . intval($m['id'])) ?>">
+                          <i class="fa fa-download"></i> Download
+                        </a>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <div class="text-muted">No materials available for your courses.</div>
+          <?php endif; ?>
+        </div>
             <?php endif; ?>
         </div>
     </div>
+</div>
+
+<!-- Add modal for course materials -->
+<div class="modal fade" id="courseMaterialsModal" tabindex="-1" aria-labelledby="courseMaterialsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="courseMaterialsModalLabel">Course Materials</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="courseMaterialsContent">
+          <div class="text-center text-muted">Loading...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <?php if (isset($role) && ($role === 'admin' || $role === 'teacher')): ?>
+          <!-- Add File button visible to admin/teacher; href set by JS when modal opens -->
+          <a id="addFileBtn" class="btn btn-primary" href="#" role="button">
+            <i class="fa fa-upload me-1"></i> Add File
+          </a>
+        <?php endif; ?>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -355,6 +443,110 @@ $(function() {
                 $('.card:contains("Enrolled Courses") .list-group').append($li);
             }
         }, 'json');
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const baseUrl = '<?= rtrim(base_url(), "/") ?>';
+    const modalEl = document.getElementById('courseMaterialsModal');
+    const bsModal = new bootstrap.Modal(modalEl);
+    const contentEl = document.getElementById('courseMaterialsContent');
+    const addFileBtn = document.getElementById('addFileBtn');
+    const canUpload = <?= (isset($role) && ($role === 'admin' || $role === 'teacher')) ? 'true' : 'false' ?>;
+
+    function renderMaterialsList(courseName, materials) {
+        if (!materials || materials.length === 0) {
+            return '<div class="text-muted">No materials uploaded for this course.</div>';
+        }
+    // helper to escape HTML in strings
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+        let html = '<div class="list-group">';
+        materials.forEach(m => {
+            const fname = (m.file_name) ? m.file_name : (m.file_path ? m.file_path.split('/').pop() : 'file');
+            html += '<div class="list-group-item d-flex justify-content-between align-items-center">';
+            html += '<div><strong>' + escapeHtml(fname) + '</strong>';
+            if (m.created_at) {
+                html += '<div class="small text-muted">Uploaded: ' + new Date(m.created_at).toLocaleDateString() + '</div>';
+            }
+            if (m.description) {
+                html += '<div class="small text-muted">Note: ' + escapeHtml(m.description) + '</div>';
+            }
+            html += '</div>';
+            html += '<div><a class="btn btn-sm btn-outline-primary" href="' + baseUrl + '/materials/download/' + parseInt(m.id) + '"><i class="fa fa-download"></i> Download</a></div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function loadMaterials(courseId, courseName) {
+        contentEl.innerHTML = '<div class="text-center py-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        // set addFileBtn if applicable
+        if (addFileBtn) {
+            if (canUpload) {
+                addFileBtn.style.display = 'inline-block';
+                addFileBtn.setAttribute('href', baseUrl + '/admin/course/' + parseInt(courseId) + '/upload');
+            } else {
+                addFileBtn.style.display = 'none';
+            }
+        }
+    fetch(baseUrl + '/materials/course/' + parseInt(courseId), {
+      method: 'GET',
+      credentials: 'same-origin', // include session cookie
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(async r => {
+        // If server returned non-JSON (redirect or HTML error), handle gracefully
+        const text = await r.text();
+        let data = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch (e) {
+          // not JSON
+          if (!r.ok) {
+            throw new Error('Server returned HTTP ' + r.status + (text ? ': ' + text : ''));
+          }
+          throw e;
+        }
+
+        if (!r.ok) {
+          // server returned JSON error message
+          const msg = (data && data.message) ? data.message : ('HTTP ' + r.status);
+          throw new Error(msg);
+        }
+
+        return data;
+      })
+      .then(data => {
+        if (data && data.status === 'success') {
+          contentEl.innerHTML = renderMaterialsList(courseName, data.materials);
+          modalEl.querySelector('.modal-title').textContent = 'Materials — ' + courseName;
+        } else {
+          contentEl.innerHTML = '<div class="alert alert-danger">Could not load materials: ' + (data && data.message ? data.message : 'Unknown error') + '</div>';
+        }
+      }).catch(err => {
+        contentEl.innerHTML = '<div class="alert alert-danger">Could not load materials: ' + (err.message || 'Error') + '</div>';
+        console.error('Materials fetch error:', err);
+      });
+    }
+
+    // Delegated click handlers
+    document.body.addEventListener('click', function(e) {
+        const btn = e.target.closest('.view-materials-btn, .view-materials-link');
+        if (!btn) return;
+        e.preventDefault();
+        const courseId = btn.getAttribute('data-course-id');
+        const courseName = btn.getAttribute('data-course-name') || ('Course ' + courseId);
+        loadMaterials(courseId, courseName);
+        bsModal.show();
     });
 });
 </script>
