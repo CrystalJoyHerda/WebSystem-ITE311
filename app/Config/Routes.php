@@ -16,36 +16,31 @@ $routes->get('/login', 'Auth::login');
 $routes->post('/login', 'Auth::login');
 $routes->get('/logout', 'Auth::logout');
 
-// Role-based dashboards (grouped and protected)
+// Role-based dashboards - ALL use Auth::dashboard
+$routes->get('admin/dashboard', 'Auth::dashboard', ['filter' => 'roleauth']);
+$routes->get('teacher/dashboard', 'Auth::dashboard', ['filter' => 'roleauth']); // ← CHANGED THIS
+$routes->get('student/dashboard', 'Auth::dashboard', ['filter' => 'roleauth']);
+
+// Admin specific routes
 $routes->group('admin', ['filter' => 'roleauth'], function($routes){
-    $routes->get('dashboard', 'Admin::dashboard'); // /admin/dashboard
-    $routes->get('courses', 'Admin::courses');    // /admin/courses
-    // add other admin routes here (e.g. $routes->get('users', 'Admin::users'); )
+    $routes->get('courses', 'Admin::courses');
 });
 
-$routes->group('teacher', ['filter' => 'roleauth'], function($routes){
-    $routes->get('dashboard', 'Teacher::dashboard'); // /teacher/dashboard
-    // add other teacher routes here
-});
-
-// student/dashboard can be left ungrouped or grouped similarly if needed
-$routes->get('student/dashboard', 'Auth::dashboard');
-
-// announcements (public / student-accessible)
+// Announcements
 $routes->get('announcement', 'Announcement::index');
-$routes->get('announcements', 'Announcement::index'); // pick one name and use it consistently
 
 // Materials routes
+$routes->get('materials/course/(:num)', 'Materials::courseMaterials/$1');
+$routes->get('materials/download/(:num)', 'Materials::download/$1');
+$routes->get('materials/delete/(:num)', 'Materials::delete/$1');
 $routes->get('admin/course/(:num)/upload', 'Materials::upload/$1');
 $routes->post('admin/course/(:num)/upload', 'Materials::upload/$1');
-$routes->get('materials/delete/(:num)', 'Materials::delete/$1');
-$routes->get('materials/download/(:num)', 'Materials::download/$1');
-// AJAX: list materials for a course (used by dashboard modal)
-$routes->get('materials/course/(:num)', 'Materials::courseMaterials/$1');
-$routes->get('materials/course/(:num)', 'Materials::courseMaterials/$1');
 
-// Log the auth session after login
-$routes->post('/login', function(){
-    log_message('debug', 'Auth session after login: ' . json_encode(session()->get()));
-});
+// Notification routes
+$routes->get('notifications', 'Notifications::get');
+$routes->post('notifications/mark_read/(:num)', 'Notifications::mark_as_read/$1');
+$routes->post('notifications/mark_all_read', 'Notifications::mark_all_as_read');
+
+// Course enrollment route
+$routes->post('course/enroll', 'Course::enroll');
 

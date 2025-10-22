@@ -86,7 +86,14 @@ log_message('debug', 'Auth session: ' . json_encode(session()->get()));
                 session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
 
                 // Redirect all authenticated users to the unified dashboard view
-                return redirect()->to(base_url('student/dashboard'));
+                $role = $user['role'];
+                if ($role === 'admin') {
+                    return redirect()->to(base_url('admin/dashboard'));
+                } elseif ($role === 'teacher') {
+                    return redirect()->to(base_url('teacher/dashboard'));
+                } else {
+                    return redirect()->to(base_url('student/dashboard'));
+                }
 
             } else {
                 session()->setFlashdata('error', 'Invalid email or password.');
@@ -133,11 +140,21 @@ public function dashboard()
             ->get()
             ->getResultArray();
     } elseif ($role === 'teacher') {
+        $userId = session()->get('userID'); // Get the teacher's ID
+        
+        log_message('debug', 'Teacher ID: ' . $userId);
+        
         $data['courses'] = $db->table('courses')
-            ->select('id, course_name AS name, description')
-            ->where('instructor_id', session()->get('userID'))
+            ->select('id, course_name AS name, description, semester, course_code')
+            ->where('instructor_id', $userId)
             ->get()
             ->getResultArray();
+        
+        log_message('debug', 'Teacher courses found: ' . count($data['courses']));
+        
+        if (empty($data['courses'])) {
+            $data['courses'] = [];
+        }
     } elseif ($role === 'student') {
         // Detect the enrollments table user/student column dynamically
         $fields = $db->getFieldData('enrollments'); // returns array of field objects

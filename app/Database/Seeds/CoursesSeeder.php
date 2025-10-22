@@ -16,6 +16,7 @@ class CoursesSeeder extends Seeder
                 'instructor_id' => 2, 
                 'semester' => '1st Semester',
                 'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
                 'course_code' => 'MATH201',
@@ -24,6 +25,7 @@ class CoursesSeeder extends Seeder
                 'instructor_id' => 2,
                 'semester' => '1st Semester',
                 'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
                 'course_code' => 'ENG101',
@@ -32,6 +34,7 @@ class CoursesSeeder extends Seeder
                 'instructor_id' => 2, 
                 'semester' => '2nd Semester',
                 'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
                 'course_code' => 'PHY111',
@@ -40,6 +43,7 @@ class CoursesSeeder extends Seeder
                 'instructor_id' => 2,
                 'semester' => '1st Semester',
                 'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
                 'course_code' => 'HIST101',
@@ -48,6 +52,7 @@ class CoursesSeeder extends Seeder
                 'instructor_id' => 2,
                 'semester' => '2nd Semester',
                 'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ],
         ];
 
