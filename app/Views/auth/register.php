@@ -97,11 +97,13 @@
                     <label for="email" class="form-label">Email ID</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fa fa-envelope"></i></span>
-                        <input type="email" class="form-control" id="email" name="email" value="<?= old('email') ?>" required>
+                        <input type="email" class="form-control" id="email" name="email" value="<?= old('email') ?>" required aria-describedby="emailHelpInline">
                     </div>
                     <?php if (isset($validation) && $validation->hasError('email')): ?>
                         <div class="text-danger mt-1"><?= $validation->getError('email') ?></div>
                     <?php endif; ?>
+                    <!-- Real-time validation message (client-side) -->
+                    <div id="emailInvalidMsg" class="form-text text-danger small mt-1 d-none">Invalid email format: only letters, numbers, @, and . are allowed.</div>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
@@ -132,6 +134,46 @@
             </form>
         </div>
     </div>
+    <script>
+        // Real-time client-side email character validation
+        (function(){
+            var emailInput = document.getElementById('email');
+            var emailMsg = document.getElementById('emailInvalidMsg');
+            var form = document.querySelector('form[action="<?= base_url('register') ?>"]');
+
+            // Allowed characters: letters, numbers, @ and .
+            var allowedRe = /^[A-Za-z0-9@.]*$/; // allow empty while typing
+
+            function checkEmailChars() {
+                var v = emailInput.value || '';
+                // strip leading/trailing spaces for validation
+                var trimmed = v.trim();
+                if (!allowedRe.test(trimmed)) {
+                    emailMsg.classList.remove('d-none');
+                    return false;
+                }
+                emailMsg.classList.add('d-none');
+                return true;
+            }
+
+            // Validate while typing
+            emailInput.addEventListener('input', function(){
+                checkEmailChars();
+            });
+
+            // On form submit, enforce the character rule (prevent submit if invalid)
+            if (form) {
+                form.addEventListener('submit', function(e){
+                    if (!checkEmailChars()) {
+                        // prevent submission and focus the field
+                        e.preventDefault();
+                        e.stopPropagation();
+                        emailInput.focus();
+                    }
+                });
+            }
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

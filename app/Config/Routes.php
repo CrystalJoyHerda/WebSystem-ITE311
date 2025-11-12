@@ -24,6 +24,10 @@ $routes->get('student/dashboard', 'Auth::dashboard', ['filter' => 'roleauth']);
 // Admin specific routes
 $routes->group('admin', ['filter' => 'roleauth'], function($routes){
     $routes->get('courses', 'Admin::courses');
+    // Admin user management endpoints (add/update/delete) — verb-aware routes
+    $routes->post('addUser', 'Admin::addUser');
+    $routes->post('updateUser', 'Admin::updateUser');
+    $routes->post('deleteUser', 'Admin::deleteUser');
 });
 
 // Announcements

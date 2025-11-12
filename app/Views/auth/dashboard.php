@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Dashboard</title>
+  <?= csrf_meta() ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- <style>
@@ -84,18 +85,32 @@
                               <th>Name</th>
                               <th>Email</th>
                               <th>Role</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             <?php if (!empty($users)): foreach ($users as $user): ?>
-                              <tr>
-                                <td><?= esc($user['name']) ?></td>
-                                <td><?= esc($user['email']) ?></td>
-                                <td><?= esc($user['role']) ?></td>
+                              <tr data-user-id="<?= intval($user['id']) ?>">
+                                <td class="user-name"><?= esc($user['name']) ?></td>
+                                <td class="user-email"><?= esc($user['email']) ?></td>
+                                <td class="user-role"><?= esc($user['role']) ?></td>
+                                <td>
+                                  <button type="button" class="btn btn-sm btn-primary me-1 edit-user-btn"
+                                      data-user-id="<?= intval($user['id']) ?>"
+                                      data-user-name="<?= esc($user['name']) ?>"
+                                      data-user-email="<?= esc($user['email']) ?>"
+                                      data-user-role="<?= esc($user['role']) ?>">
+                                    <i class="fa fa-edit"></i> Update
+                                  </button>
+                                  <?php $isAdmin = (isset($user['role']) && $user['role'] === 'admin'); ?>
+                                  <button type="button" class="btn btn-sm <?= $isAdmin ? 'btn-outline-danger' : 'btn-danger' ?> delete-user-btn" data-user-id="<?= intval($user['id']) ?>" data-user-role="<?= esc($user['role']) ?>" <?= $isAdmin ? 'title="Cannot delete another admin"' : '' ?>>
+                                    <i class="fa fa-trash"></i> Delete
+                                  </button>
+                                </td>
                               </tr>
                             <?php endforeach; else: ?>
                               <tr>
-                                <td colspan="3" class="text-muted text-center">No users found.</td>
+                                <td colspan="4" class="text-muted text-center">No users found.</td>
                               </tr>
                             <?php endif; ?>
                           </tbody>
@@ -107,6 +122,45 @@
                     </div>
                   </div>
                 </div>
+                <!-- Edit User Modal -->
+                <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <form id="editUserForm" action="<?= base_url('admin/updateUser') ?>" method="post">
+                        <input type="hidden" name="id" id="edit-user-id">
+                        <div class="modal-body">
+                          <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" id="edit-user-name" required>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" id="edit-user-email" required>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Role</label>
+                            <select class="form-select" name="role" id="edit-user-role" required>
+                              <option value="admin">Admin</option>
+                              <option value="teacher">Teacher</option>
+                              <option value="student">Student</option>
+                            </select>
+                          </div>
+                          <div class="mb-3">
+                            <label class="form-label">Change Password <small class="text-muted">(leave blank to keep current)</small></label>
+                            <input type="password" class="form-control" name="password" id="edit-user-password" placeholder="New password (optional)">
+                          </div>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="submit" class="btn btn-primary w-100">Save changes</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
                 <!-- Add User Modal -->
                 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
                   <div class="modal-dialog">
@@ -115,19 +169,21 @@
                         <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                       </div>
-                      <form action="<?= base_url('admin/addUser') ?>" method="post">
+                      <form id="addUserForm" action="<?= base_url('admin/addUser') ?>" method="post">
                         <div class="modal-body">
                           <div class="mb-3">
                             <label class="form-label">Name</label>
-                            <input type="text" class="form-control" name="name" required>
+                            <input type="text" class="form-control" name="name" id="add-name" required>
+                            <div id="addNameInvalid" class="form-text text-danger small mt-1 d-none">Name may only contain letters, numbers and spaces.</div>
                           </div>
                           <div class="mb-3">
                             <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="email" required>
+                            <input type="email" class="form-control" name="email" id="add-email" required>
+                            <div id="addEmailInvalid" class="form-text text-danger small mt-1 d-none">Invalid email format: only letters, numbers, @, and . are allowed.</div>
                           </div>
                           <div class="mb-3">
                             <label class="form-label">Role</label>
-                            <select class="form-select" name="role" required>
+                            <select class="form-select" name="role" id="add-role" required>
                               <option value="admin">Admin</option>
                               <option value="teacher">Teacher</option>
                               <option value="student">Student</option>
@@ -135,13 +191,51 @@
                           </div>
                           <div class="mb-3">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="password" required>
+                            <input type="password" class="form-control" name="password" id="add-password" required>
+                            <div id="addPasswordInvalid" class="form-text text-danger small mt-1 d-none">Password must be at least 6 characters.</div>
                           </div>
                         </div>
                         <div class="modal-footer">
-                          <button type="submit" class="btn btn-success w-100">Add User</button>
+                          <button type="submit" id="addUserSubmit" class="btn btn-success w-100">Add User</button>
                         </div>
                       </form>
+                    </div>
+                  </div>
+                </div>
+                <!-- Delete Confirmation Modal -->
+                <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="deleteConfirmModalLabel">Confirm Delete</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        <p id="deleteConfirmMessage">Are you sure you want to delete this user?</p>
+                        <div id="deleteAlertPlaceholder"></div>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Confirm Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Cannot Delete (admin) Modal -->
+                <div class="modal fade" id="cannotDeleteModal" tabindex="-1" aria-labelledby="cannotDeleteModalLabel" aria-hidden="true">
+                  <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="cannotDeleteModalLabel">Action not allowed</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        <p class="mb-0">You cannot delete another admin account.</p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -412,6 +506,19 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// Configure jQuery AJAX to include CSRF header (CodeIgniter)
+$(function(){
+  try {
+    var csrfHeaderName = '<?= csrf_header() ?>';
+    var csrfToken = $('meta[name="' + csrfHeaderName + '"]').attr('content');
+    if (csrfHeaderName && csrfToken) {
+      $.ajaxSetup({ headers: { [csrfHeaderName]: csrfToken } });
+    }
+  } catch (e) {
+    console.warn('CSRF header setup failed', e);
+  }
+});
+
 $(function() {
     // Listen for enroll button click
     $('.enroll-btn').on('click', function(e) {
@@ -549,6 +656,229 @@ document.addEventListener('DOMContentLoaded', function() {
         bsModal.show();
     });
 });
+</script>
+<script>
+// Users actions: edit & delete handlers
+$(function(){
+  // Open Edit modal and populate fields
+  $(document).on('click', '.edit-user-btn', function(e){
+    e.preventDefault();
+    var $btn = $(this);
+    var id = $btn.data('user-id');
+    var name = $btn.data('user-name');
+    var email = $btn.data('user-email');
+    var role = $btn.data('user-role');
+
+    $('#edit-user-id').val(id);
+    $('#edit-user-name').val(name);
+    $('#edit-user-email').val(email);
+    $('#edit-user-role').val(role);
+  // clear password field - optional
+  $('#edit-user-password').val('');
+
+    var editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    editModal.show();
+  });
+
+  // Submit edit form via AJAX to avoid full page reload
+  $('#editUserForm').on('submit', function(e){
+    e.preventDefault();
+    var form = this;
+    var action = $(form).attr('action');
+    // clear previous alerts
+    $('#editUserModal .alert').remove();
+
+    // CSRF header and token
+    var CSRF_HEADER = '<?= csrf_header() ?>';
+    var CSRF_TOKEN = $('meta[name="' + CSRF_HEADER + '"]').attr('content') || '';
+
+    var fd = new FormData(form);
+    console.debug('Update request ->', action, fd);
+
+    fetch(action, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: Object.assign({ 'X-Requested-With': 'XMLHttpRequest' }, CSRF_HEADER && CSRF_TOKEN ? { [CSRF_HEADER]: CSRF_TOKEN } : {}),
+      body: fd
+    })
+    .then(async function(resp){
+      console.debug('Update response status', resp.status, resp.statusText);
+      var text = await resp.text();
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (err) { console.error('Invalid JSON update response', text); throw { status: resp.status, text: text }; }
+      var newToken = resp.headers.get(CSRF_HEADER);
+      if (newToken) { CSRF_TOKEN = newToken; $('meta[name="' + CSRF_HEADER + '"]').attr('content', CSRF_TOKEN); }
+      if (!resp.ok) throw { status: resp.status, body: data };
+      return data;
+    })
+    .then(function(data){
+      if (data && data.status === 'success') {
+        var id = data.user.id;
+        var $row = $('tr[data-user-id="' + id + '"]');
+        $row.find('.user-name').text(data.user.name);
+        $row.find('.user-email').text(data.user.email);
+        $row.find('.user-role').text(data.user.role);
+        var $editBtn = $row.find('.edit-user-btn');
+        $editBtn.attr('data-user-name', data.user.name).attr('data-user-email', data.user.email).attr('data-user-role', data.user.role);
+        var $delBtn = $row.find('.delete-user-btn');
+        $delBtn.attr('data-user-role', data.user.role);
+        if (data.user.role === 'admin') { $delBtn.removeClass('btn-danger').addClass('btn-outline-danger'); } else { $delBtn.removeClass('btn-outline-danger').addClass('btn-danger'); }
+        bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+        var $msg = $('<div class="alert alert-success mt-2" role="alert">' + (data.message || 'User updated') + '</div>');
+        $('#usersModal .modal-body').prepend($msg);
+        setTimeout(function(){ $msg.fadeOut(300, function(){ $(this).remove(); }); }, 2500);
+      } else {
+        var msg = (data && data.message) ? data.message : 'Update failed';
+        var $err = $('<div class="alert alert-danger mt-2" role="alert">' + msg + '</div>');
+        $('#editUserModal .modal-body').prepend($err);
+      }
+    })
+    .catch(function(err){
+      console.error('Update request error', err);
+      var msg = (err && err.body && err.body.message) ? err.body.message : (err && err.text) ? err.text : 'Request failed.';
+      var $err = $('<div class="alert alert-danger mt-2" role="alert">' + msg + ' (status: ' + (err.status || 'n/a') + ')</div>');
+      $('#editUserModal .modal-body').prepend($err);
+    });
+  });
+
+  // Delete flow using modals
+  var deleteTargetId = null;
+  var deleteTargetRow = null;
+  var deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+  var cannotDeleteModal = new bootstrap.Modal(document.getElementById('cannotDeleteModal'));
+
+  $(document).on('click', '.delete-user-btn', function(e){
+    e.preventDefault();
+    var $btn = $(this);
+    var id = $btn.data('user-id');
+    var role = $btn.data('user-role');
+    var name = $btn.closest('tr').find('.user-name').text() || '';
+
+    if (role === 'admin') {
+      // Show cannot-delete modal
+      cannotDeleteModal.show();
+      return;
+    }
+
+    // Prepare confirmation modal
+    deleteTargetId = id;
+    deleteTargetRow = $btn.closest('tr');
+    $('#deleteConfirmMessage').text('Are you sure you want to delete user "' + name + '"?');
+    $('#deleteAlertPlaceholder').html('');
+    deleteConfirmModal.show();
+  });
+
+  // Confirm delete action
+  $('#confirmDeleteBtn').on('click', function(){
+    if (!deleteTargetId) return;
+    var $btn = $(this);
+    $btn.prop('disabled', true).text('Deleting...');
+
+    var CSRF_HEADER = '<?= csrf_header() ?>';
+    var CSRF_TOKEN = $('meta[name="' + CSRF_HEADER + '"]').attr('content') || '';
+
+    var body = new URLSearchParams();
+    body.append('id', deleteTargetId);
+
+    fetch('<?= base_url('admin/deleteUser') ?>', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: Object.assign({ 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, CSRF_HEADER && CSRF_TOKEN ? { [CSRF_HEADER]: CSRF_TOKEN } : {}),
+      body: body.toString()
+    })
+    .then(async function(resp){
+      console.debug('Delete response status', resp.status, resp.statusText);
+      var text = await resp.text();
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (err) { console.error('Invalid JSON delete response', text); throw { status: resp.status, text: text }; }
+      var newToken = resp.headers.get(CSRF_HEADER);
+      if (newToken) { $('meta[name="' + CSRF_HEADER + '"]').attr('content', newToken); }
+      if (!resp.ok) throw { status: resp.status, body: data };
+      return data;
+    })
+    .then(function(data){
+      $btn.prop('disabled', false).text('Confirm Delete');
+      if (data && data.status === 'success') {
+        deleteConfirmModal.hide();
+        deleteTargetRow.fadeOut(200, function(){ $(this).remove(); });
+        var $msg = $('<div class="alert alert-success mt-2" role="alert">' + (data.message || 'User deleted') + '</div>');
+        $('#usersModal .modal-body').prepend($msg);
+        setTimeout(function(){ $msg.fadeOut(300, function(){ $(this).remove(); }); }, 2500);
+        deleteTargetId = null; deleteTargetRow = null;
+      } else {
+        var m = (data && data.message) ? data.message : 'Delete failed';
+        $('#deleteAlertPlaceholder').html('<div class="alert alert-danger">' + m + '</div>');
+      }
+    })
+    .catch(function(err){
+      console.error('Delete request error', err);
+      $btn.prop('disabled', false).text('Confirm Delete');
+      var msg = (err && err.body && err.body.message) ? err.body.message : (err && err.text) ? err.text : 'Request failed.';
+      $('#deleteAlertPlaceholder').html('<div class="alert alert-danger">' + msg + ' (status: ' + (err.status || 'n/a') + ')</div>');
+    });
+  });
+});
+</script>
+<script>
+// Client-side validation for Add User modal (real-time + prevent submit)
+(function(){
+  var form = document.getElementById('addUserForm');
+  if (!form) return;
+  var nameInput = document.getElementById('add-name');
+  var emailInput = document.getElementById('add-email');
+  var passwordInput = document.getElementById('add-password');
+  var submitBtn = document.getElementById('addUserSubmit');
+  var nameErr = document.getElementById('addNameInvalid');
+  var emailErr = document.getElementById('addEmailInvalid');
+  var pwdErr = document.getElementById('addPasswordInvalid');
+
+  // Allowed patterns
+  var nameRe = /^[A-Za-z0-9 ]+$/; // letters, numbers, spaces
+  var emailCharsRe = /^[A-Za-z0-9@.]+$/; // only letters, numbers, @ and .
+
+  function validateName() {
+    var v = (nameInput.value || '').trim();
+    if (!v || !nameRe.test(v)) { nameErr.classList.remove('d-none'); return false; }
+    nameErr.classList.add('d-none'); return true;
+  }
+  function validateEmailChars() {
+    var v = (emailInput.value || '').trim();
+    if (!v || !emailCharsRe.test(v)) { emailErr.classList.remove('d-none'); return false; }
+    emailErr.classList.add('d-none'); return true;
+  }
+  function validatePassword() {
+    var v = passwordInput.value || '';
+    if (!v || v.length < 6) { pwdErr.classList.remove('d-none'); return false; }
+    pwdErr.classList.add('d-none'); return true;
+  }
+
+  function updateSubmitState(){
+    var ok = validateName() && validateEmailChars() && validatePassword();
+    submitBtn.disabled = !ok;
+    return ok;
+  }
+
+  // Live validation
+  nameInput.addEventListener('input', updateSubmitState);
+  emailInput.addEventListener('input', updateSubmitState);
+  passwordInput.addEventListener('input', updateSubmitState);
+
+  // Prevent submit if invalid
+  form.addEventListener('submit', function(e){
+    if (!updateSubmitState()) { e.preventDefault(); e.stopPropagation(); nameInput.focus(); }
+  });
+
+  // When modal opens, reset state
+  var addModalEl = document.getElementById('addUserModal');
+  if (addModalEl) {
+    addModalEl.addEventListener('show.bs.modal', function(){
+      // reset values and messages
+      form.reset();
+      nameErr.classList.add('d-none'); emailErr.classList.add('d-none'); pwdErr.classList.add('d-none');
+      submitBtn.disabled = true;
+    });
+  }
+})();
 </script>
 </body>
 </html>
