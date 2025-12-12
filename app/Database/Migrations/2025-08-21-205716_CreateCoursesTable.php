@@ -4,7 +4,7 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-class CreateCoursesTable extends Migration
+class CreateSubjectTable extends Migration
 {
    public function up()
     {
@@ -15,11 +15,11 @@ class CreateCoursesTable extends Migration
                 'unsigned' => true,
                 'auto_increment' => true,
             ],
-            'course_code' => [
+            'subject_code' => [
                 'type' => 'VARCHAR',
                 'constraint' => 20,
             ],
-            'course_name' => [
+            'subject_name' => [
                 'type' => 'VARCHAR',
                 'constraint' => 150,
             ],
@@ -49,7 +49,7 @@ class CreateCoursesTable extends Migration
         ]);
         
         $this->forge->addPrimaryKey('id');
-        $this->forge->addUniqueKey('course_code');
+        $this->forge->addUniqueKey('subject_code');
         $this->forge->addKey('instructor_id');
         $this->forge->addForeignKey('instructor_id', 'users', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('courses');

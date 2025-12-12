@@ -16,7 +16,42 @@ class App extends BaseConfig
      *
      * E.g., http://example.com/
      */
+    /**
+     * Leave empty to auto-detect from the current request when running in a
+     * web environment. This avoids hardcoding the host/path and works well
+     * for local XAMPP development where the project folder may vary.
+     */
     public string $baseURL = 'http://localhost/ITE311-HERDA/';
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        // Only try to auto-detect when not running from CLI and when a host
+        // is available. This keeps unit tests and CLI commands safe.
+        if (empty($this->baseURL) && PHP_SAPI !== 'cli' && isset($_SERVER['HTTP_HOST'])) {
+            $isHTTPS = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+
+            $scheme = $isHTTPS ? 'https' : 'http';
+            $host   = $_SERVER['HTTP_HOST'];
+
+            // Determine the base path from the script name (e.g. /ITE311-HERDA/public/index.php)
+            $script = $_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '';
+            $dir = str_replace('\\', '/', dirname($script));
+            $dir = rtrim($dir, '/');
+
+            // If running with the public folder in the path, strip it so baseURL
+            // points to the project root (e.g. /ITE311-HERDA/)
+            if (substr($dir, -7) === '/public') {
+                $dir = substr($dir, 0, -7);
+            }
+
+            // Ensure a trailing slash and proper root value
+            $path = ($dir === '.' || $dir === '/') ? '' : $dir;
+            $this->baseURL = $scheme . '://' . $host . ($path === '' ? '/' : $path . '/');
+        }
+    }
 
     /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.

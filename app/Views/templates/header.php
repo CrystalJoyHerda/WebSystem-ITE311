@@ -109,6 +109,13 @@
                 </span>
               </li>
               <li><hr class="dropdown-divider"></li>
+              <?php if ($role === 'admin'): ?>
+              <li>
+                <a class="dropdown-item" href="<?= base_url('admin/aboutUsers') ?>">
+                  <i class="fa fa-info-circle me-1"></i>About Users
+                </a>
+              </li>
+              <?php endif; ?>
               <li>
                 <a class="dropdown-item text-danger" href="<?= base_url('logout') ?>">
                   <i class="fa fa-sign-out-alt me-1"></i>Logout
@@ -182,6 +189,55 @@ $(document).ready(function() {
             }
         });
     }
+    
+    // Mark all notifications as read when bell dropdown is shown
+    $('#notificationDropdown').on('show.bs.dropdown', function() {
+        const badge = $('#notificationBadge');
+        const unreadCount = parseInt(badge.text()) || 0;
+        
+        if (unreadCount > 0) {
+            // Mark all as read via AJAX
+            $.ajax({
+                url: baseUrl + '/notifications/mark_all_read',
+                method: 'POST',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Hide badge
+                        badge.hide();
+                        // Reload notifications to update the UI
+                        loadNotifications();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Failed to mark notifications as read:', xhr.statusText);
+                }
+            });
+        }
+    });
+    
+    // Mark all as read button click handler
+    $('#markAllRead').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        $.ajax({
+            url: baseUrl + '/notifications/mark_all_read',
+            method: 'POST',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Hide badge
+                    $('#notificationBadge').hide();
+                    // Reload notifications to update UI
+                    loadNotifications();
+                }
+            },
+            error: function(xhr) {
+                console.error('Failed to mark all as read:', xhr.statusText);
+            }
+        });
+    });
     
     // Function to escape HTML
     function escapeHtml(text) {

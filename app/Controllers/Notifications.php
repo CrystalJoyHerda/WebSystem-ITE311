@@ -109,10 +109,7 @@ class Notifications extends Controller
         $userId = session()->get('userID');
         
         // Update all unread notifications for this user
-        $success = $this->notificationModel->where('user_id', $userId)
-                                           ->where('is_read', 0)
-                                           ->set(['is_read' => 1])
-                                           ->update();
+        $success = $this->notificationModel->markAllAsRead($userId);
 
         if ($success !== false) {
             return $this->response->setJSON([

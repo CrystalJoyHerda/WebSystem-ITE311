@@ -1,10 +1,24 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Change this to match your project folder name
-    RewriteBase /ITE311-HERDA/
+    # SECURITY: Block attempts to use directory traversal or malformed paths
+    # Deny any request containing ".." or "//" in the request URI.
+    # This prevents requests like /../../ or // from being proxied outside
+    # the application and stops accidental visits to the XAMPP dashboard.
+    RewriteCond %{REQUEST_URI} \.\.
+    RewriteRule .* - [F,L]
+    RewriteCond %{REQUEST_URI} //
+    RewriteRule .* - [F,L]
 
-    # If the request is not already pointing to /public, redirect it there
-    RewriteCond %{REQUEST_URI} !^/ITE311-HERDA/public/
+    # If the request already points to /public, leave it alone
+    RewriteCond %{REQUEST_URI} !/public/
+
+    # If requesting a real file/directory in this project root, serve it directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Otherwise internally rewrite everything to the public/ directory
+    # so CodeIgniter's front controller handles the request.
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>

@@ -20,6 +20,12 @@ class CreateNotificationsTable extends Migration
                 'constraint' => 11,
                 'unsigned'   => true,
             ],
+            'type' => [
+                'type'       => 'VARCHAR',
+                'constraint' => 50,
+                'default'    => 'general',
+                'null'       => false,
+            ],
             'message' => [
                 'type'       => 'VARCHAR',
                 'constraint' => '255',
@@ -30,6 +36,10 @@ class CreateNotificationsTable extends Migration
                 'default'    => 0,
             ],
             'created_at' => [
+                'type' => 'DATETIME',
+                'null' => true,
+            ],
+            'updated_at' => [
                 'type' => 'DATETIME',
                 'null' => true,
             ],

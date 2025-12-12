@@ -78,7 +78,8 @@ class CreateQuizzesTable extends Migration
         
         $this->forge->addPrimaryKey('id');
         $this->forge->addKey('lesson_id');
-        $this->forge->addKey('question_type');  // This field now exists
+        $this->forge->addKey('question_type');  // Index for performance
+        $this->forge->addKey('created_at');  // Index for performance on date queries
         $this->forge->addForeignKey('lesson_id', 'lessons', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('quizzes');
     }

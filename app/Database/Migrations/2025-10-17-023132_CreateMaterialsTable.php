@@ -28,6 +28,27 @@ class CreateMaterialsTable extends Migration
                 'type' => 'VARCHAR',
                 'constraint' => 255,
             ],
+            'file_size' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'unsigned' => true,
+                'null' => true,
+            ],
+            'file_type' => [
+                'type' => 'VARCHAR',
+                'constraint' => 100,
+                'null' => true,
+            ],
+            'uploaded_by' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'unsigned' => true,
+                'null' => false,
+            ],
+            'uploaded_at' => [
+                'type' => 'DATETIME',
+                'null' => false,
+            ],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,
@@ -36,6 +57,7 @@ class CreateMaterialsTable extends Migration
 
         $this->forge->addKey('id', true);
         $this->forge->addForeignKey('course_id', 'courses', 'id', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('uploaded_by', 'users', 'id', 'CASCADE', 'CASCADE');
         $this->forge->createTable('materials');
     }
 

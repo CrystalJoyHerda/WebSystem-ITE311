@@ -55,7 +55,7 @@ class Course extends Controller
                 $notificationModel = new NotificationModel();
                 $notificationModel->insert([
                     'user_id' => $user_id,
-                    'message' => 'You have been enrolled in ' . $course['course_name'],
+                    'message' => 'You have been enrolled in ' . $course['subject_name'],
                     'is_read' => 0,
                     'created_at' => date('Y-m-d H:i:s')
                 ]);
@@ -69,6 +69,96 @@ class Course extends Controller
             return $this->response->setJSON([
                 'status' => 'error',
                 'message' => 'Enrollment failed. Please try again.'
+            ]);
+        }
+    }
+
+    /**
+     * Student requests enrollment in an assigned course
+     */
+    public function requestEnrollment()
+    {
+        // Check if user is logged in as student
+        if (!session()->get('isLoggedIn') || session()->get('role') !== 'student') {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Unauthorized access.'
+            ]);
+        }
+
+        $studentId = session()->get('userID');
+        $courseId = $this->request->getPost('course_id');
+
+        if (!$courseId) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Course ID is required.'
+            ]);
+        }
+
+        $enrollmentModel = new EnrollmentModel();
+        $notificationModel = new NotificationModel();
+        $db = \Config\Database::connect();
+
+        try {
+            // Check if course is assigned or rejected for this student
+            $enrollment = $enrollmentModel->where('user_id', $studentId)
+                ->where('course_id', $courseId)
+                ->whereIn('status', ['assigned', 'rejected'])
+                ->first();
+
+            if (!$enrollment) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'This course is not available for enrollment request.'
+                ]);
+            }
+
+            // Update enrollment status to 'pending'
+            $enrollmentModel->update($enrollment['id'], [
+                'status' => 'pending'
+            ]);
+
+            // Get course and teacher details
+            $course = $db->table('courses')->where('id', $courseId)->get()->getRowArray();
+            $teacherId = $course['instructor_id'] ?? null;
+
+            if ($teacherId) {
+                // Notify teacher
+                $student = $db->table('users')->where('id', $studentId)->get()->getRowArray();
+                $courseName = $course['subject_name'] ?? $course['course_name'] ?? 'a course';
+                $studentName = $student['name'] ?? 'A student';
+
+                $notificationModel->insert([
+                    'user_id' => $teacherId,
+                    'type' => 'enrollment_request',
+                    'message' => $studentName . ' has requested enrollment in: ' . $courseName,
+                    'is_read' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+
+            // Notify student
+            $notificationModel->insert([
+                'user_id' => $studentId,
+                'type' => 'enrollment_request',
+                'message' => 'Your enrollment request has been sent to the teacher for approval.',
+                'is_read' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+
+            return $this->response->setJSON([
+                'status' => 'success',
+                'message' => 'Enrollment request sent to teacher for approval.'
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Request enrollment failed: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to send enrollment request.'
             ]);
         }
     }

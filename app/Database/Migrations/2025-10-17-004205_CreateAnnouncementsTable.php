@@ -24,14 +24,27 @@ class CreateAnnouncementsTable extends Migration
                 'type' => 'TEXT',
                 'null' => false,
             ],
+            'author_id' => [
+                'type'       => 'INT',
+                'constraint' => 11,
+                'unsigned'   => true,
+                'null'       => false,
+            ],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => false,
+            ],
+            'updated_at' => [
+                'type' => 'DATETIME',
+                'null' => true,
             ],
         ]);
 
         // Set primary key
         $this->forge->addKey('id', true);
+        
+        // Add foreign key for author tracking
+        $this->forge->addForeignKey('author_id', 'users', 'id', 'CASCADE', 'CASCADE');
 
         // Create the table
         $this->forge->createTable('announcements');

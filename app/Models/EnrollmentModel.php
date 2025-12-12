@@ -9,7 +9,7 @@ class EnrollmentModel extends Model
 {
     protected $table      = 'enrollments';
     protected $primaryKey = 'id';
-    protected $allowedFields = ['user_id', 'course_id', 'enrollment_date'];
+    protected $allowedFields = ['user_id', 'subjects_id', 'course_id', 'enrollment_date', 'status', 'approved_by'];
     public $timestamps = false;
 
     // Enroll a user in a course
@@ -29,7 +29,7 @@ class EnrollmentModel extends Model
     {
         return $this->where([
             'user_id' => $user_id,
-            'course_id' => $course_id
+            'subjects_id' => $course_id
         ])->countAllResults() > 0;
     }
 }

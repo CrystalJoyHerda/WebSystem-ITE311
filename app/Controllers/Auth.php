@@ -2,12 +2,14 @@
 
 namespace App\Controllers;
 use CodeIgniter\Controller;
+use CodeIgniter\Database\BaseBuilder;
 use App\Models\MaterialModel;
 
 class Auth extends Controller
 {
     protected $db;
     protected $builder;
+    protected $userModel;
 
     public function __construct()
     {
@@ -39,7 +41,9 @@ class Auth extends Controller
                 ];
 
                 if ($this->builder->insert($newData)) {
-                    session()->setFlashdata('success', 'Registration successful. You can now log in.');
+                    // Use a normal session variable (not flashdata) so the login
+                    // page can display the message once and then remove it.
+                    session()->set('registration_success', 'User registered successfully!');
                     return redirect()->to(base_url('login'));
                 } else {
                     session()->setFlashdata('error', 'Registration failed. Please try again.');
@@ -67,34 +71,42 @@ class Auth extends Controller
             $email    = $this->request->getPost('email');
             $password = $this->request->getPost('password');
             
-            $user = $this->builder
-                ->where('email', $email)
-                ->get()
-                ->getRowArray();
+            // Fetch the user by email using the DB builder (returns array or null)
+            $user = $this->builder->where('email', $email)->get()->getRowArray();
 
-            if ($user && password_verify($password, $user['password'])) {
-                session()->set([
-                    'userID'     => $user['id'],
-                    'name'       => $user['name'],
-                    'email'      => $user['email'],
-                    'role'       => $user['role'],
-                    'isLoggedIn' => true    
-                ]);
-                // after session()->set([...])
-log_message('debug', 'Auth session: ' . json_encode(session()->get()));
-
-                session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
-
-                // Redirect all authenticated users to the unified dashboard view
-                $role = $user['role'];
-                if ($role === 'admin') {
-                    return redirect()->to(base_url('admin/dashboard'));
-                } elseif ($role === 'teacher') {
-                    return redirect()->to(base_url('teacher/dashboard'));
-                } else {
-                    return redirect()->to(base_url('student/dashboard'));
+            if ($user) {
+                // Check if user account is inactive
+                if (isset($user['status']) && $user['status'] === 'inactive') {
+                    session()->setFlashdata('error', 'Your account is inactive. Please contact the administrator.');
+                    return view('auth/login', $data);
                 }
 
+                // Verify password
+                if (password_verify($password, $user['password'])) {
+                    session()->set([
+                        'userID'     => $user['id'],
+                        'name'       => $user['name'],
+                        'email'      => $user['email'],
+                        'role'       => $user['role'],
+                        'isLoggedIn' => true    
+                    ]);
+                    // after session()->set([...])
+log_message('debug', 'Auth session: ' . json_encode(session()->get()));
+
+                    session()->setFlashdata('success', 'Welcome back, ' . $user['name'] . '!');
+
+                    // Redirect all authenticated users to the unified dashboard view
+                    $role = $user['role'];
+                    if ($role === 'admin') {
+                        return redirect()->to(base_url('admin/dashboard'));
+                    } elseif ($role === 'teacher') {
+                        return redirect()->to(base_url('teacher/dashboard'));
+                    } else {
+                        return redirect()->to(base_url('student/dashboard'));
+                    }
+                } else {
+                    session()->setFlashdata('error', 'Invalid email or password.');
+                }
             } else {
                 session()->setFlashdata('error', 'Invalid email or password.');
             }
@@ -131,21 +143,47 @@ public function dashboard()
         'name' => session()->get('name')
     ];
 
-    if ($role === 'admin') {
-        $data['totalUsers']   = $db->table('users')->countAllResults();
-        $data['totalCourses'] = $db->table('courses')->countAllResults();
-        $data['users'] = $db->table('users')->get()->getResultArray();
-        $data['coursesList'] = $db->table('courses')
-            ->select('id, course_name AS name, description')
-            ->get()
-            ->getResultArray();
+        if ($role === 'admin') {
+        // Use DB table queries for user counts and lists when UserModel is not present
+        /** @var BaseBuilder $usersBuilder */
+        $usersBuilder = $db->table('users');
+        /** @var BaseBuilder $coursesBuilder */
+        $coursesBuilder = $db->table('courses');
+            // Only count and list active users if column exists
+        try {
+            $userFields = $db->getFieldNames('users');
+            if (in_array('status', $userFields)) {
+                $data['totalUsers']   = $usersBuilder->where('status', 'active')->countAllResults();
+                $data['users'] = $usersBuilder->where('status', 'active')->get()->getResultArray();
+            } else {
+                // status column not present yet; treat all users as active
+                $data['totalUsers'] = $usersBuilder->countAllResults();
+                $data['users'] = $usersBuilder->get()->getResultArray();
+                session()->setFlashdata('warning', 'Status column missing; showing all users. Run migrations to enable soft-delete.');
+            }
+
+            $data['totalCourses'] = $coursesBuilder->countAllResults();
+            $data['coursesList'] = $coursesBuilder
+                ->select('id, subject_name AS name, description')
+                ->get()
+                ->getResultArray();
+        } catch (\Exception $e) {
+            // On error, fallback to safe defaults
+            $data['totalUsers'] = 0;
+            $data['users'] = [];
+            $data['totalCourses'] = 0;
+            $data['coursesList'] = [];
+            log_message('error', 'Auth::dashboard failed to load users: ' . $e->getMessage());
+        }
     } elseif ($role === 'teacher') {
         $userId = session()->get('userID'); // Get the teacher's ID
         
         log_message('debug', 'Teacher ID: ' . $userId);
         
-        $data['courses'] = $db->table('courses')
-            ->select('id, course_name AS name, description, semester, course_code')
+        /** @var BaseBuilder $teacherCoursesBuilder */
+        $teacherCoursesBuilder = $db->table('courses');
+        $data['courses'] = $teacherCoursesBuilder
+            ->select('id, subject_name AS name, description, semester, subject_code')
             ->where('instructor_id', $userId)
             ->get()
             ->getResultArray();
@@ -178,10 +216,13 @@ public function dashboard()
         }
 
         // Get enrolled courses with details
-        $data['enrolledCourses'] = $db->table('enrollments')
-            ->select('courses.id, courses.course_name as name, courses.description, enrollments.enrollment_date')
+        /** @var BaseBuilder $enrollmentsBuilder */
+        $enrollmentsBuilder = $db->table('enrollments');
+        $data['enrolledCourses'] = $enrollmentsBuilder
+            ->select('courses.id, courses.subject_code as code, courses.subject_name as name, courses.description, courses.semester, enrollments.enrollment_date')
             ->join('courses', 'courses.id = enrollments.course_id')
             ->where("enrollments.{$enrollmentUserCol}", session()->get('userID'))
+            ->where('enrollments.status', 'enrolled')
             ->get()
             ->getResultArray();
 
@@ -202,17 +243,33 @@ public function dashboard()
                 $courseMaterials[intval($m['course_id'])][] = $m;
             }
             $data['courseMaterials'] = $courseMaterials;
-            $data['availableCourses'] = $db->table('courses')
-                ->select('id, course_name as name, description')
-                ->whereNotIn('id', $enrolledCourseIds)
+            
+            // Get assigned/pending/rejected courses for this student
+            $assignedCourses = $db->table('enrollments')
+                ->select('courses.id, courses.subject_code as code, courses.subject_name as name, courses.description, courses.semester, enrollments.status')
+                ->join('courses', 'courses.id = enrollments.course_id')
+                ->where("enrollments.{$enrollmentUserCol}", session()->get('userID'))
+                ->whereIn('enrollments.status', ['assigned', 'pending', 'rejected'])
                 ->get()
                 ->getResultArray();
+            $data['availableCourses'] = $assignedCourses;
         } else {
             $data['courseMaterials'] = [];
-            $data['availableCourses'] = $db->table('courses')->select('id, course_name as name, description')->get()->getResultArray();
+            
+            // Get assigned/pending/rejected courses for this student
+            $assignedCourses = $db->table('enrollments')
+                ->select('courses.id, courses.subject_code as code, courses.subject_name as name, courses.description, courses.semester, enrollments.status')
+                ->join('courses', 'courses.id = enrollments.course_id')
+                ->where("enrollments.{$enrollmentUserCol}", session()->get('userID'))
+                ->whereIn('enrollments.status', ['assigned', 'pending', 'rejected'])
+                ->get()
+                ->getResultArray();
+            $data['availableCourses'] = $assignedCourses;
         }
     }
-    $data['coursesList'] = $db->table('courses')->get()->getResultArray();
+    /** @var BaseBuilder $coursesListBuilder */
+    $coursesListBuilder = $db->table('courses');
+    $data['coursesList'] = $coursesListBuilder->get()->getResultArray();
 
     return view('auth/dashboard', $data);
 }
