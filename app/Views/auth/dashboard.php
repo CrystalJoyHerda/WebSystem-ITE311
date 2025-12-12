@@ -626,6 +626,30 @@
                                             <h6 class="mb-0"><i class="fas fa-list me-2"></i>All Courses</h6>
                                         </div>
                                         <div class="card-body">
+                                            <!-- Search and Filter Controls -->
+                                            <div class="p-3 border-bottom bg-light mb-3">
+                                                <div class="row g-2">
+                                                    <div class="col-md-8">
+                                                        <div class="input-group input-group-sm">
+                                                            <span class="input-group-text">
+                                                                <i class="fa fa-search"></i>
+                                                            </span>
+                                                            <input type="text" class="form-control" id="courseSearchInput" placeholder="Search by course code or name...">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <select class="form-select form-select-sm" id="semesterFilterSelect">
+                                                            <option value="">All Semesters</option>
+                                                            <option value="1st Semester">1st Semester</option>
+                                                            <option value="2nd Semester">2nd Semester</option>
+                                                            <option value="Summer">Summer</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted d-block mt-2">
+                                                    <span id="courseCountDisplay">Loading courses...</span>
+                                                </small>
+                                            </div>
                                             <div id="coursesListContainer">
                                                 <div class="text-center">
                                                     <div class="spinner-border spinner-border-sm" role="status">
@@ -1111,7 +1135,7 @@ $(function(){
   // Admin Users Search and Filter Functionality
   // ========================================
   <?php if ($role === 'admin'): ?>
-  // Live search for users (debounced for performance)
+  // Live client-side search for users (debounced for performance)
   let searchTimeout;
   $('#userSearchInput').on('keyup', function() {
     clearTimeout(searchTimeout);
@@ -1125,7 +1149,7 @@ $(function(){
     filterUsers();
   });
   
-  // Filter users based on search and role selection
+  // Client-side filter users based on search and role selection
   function filterUsers() {
     const searchTerm = $('#userSearchInput').val().toLowerCase().trim();
     const selectedRole = $('#roleFilterSelect').val().toLowerCase();
@@ -1170,6 +1194,125 @@ $(function(){
       $('#noUsersMessage').remove();
     }
   }
+  
+  // ========================================
+  // Server-side AJAX search functionality
+  // ========================================
+  // Optional: Add a button to trigger server-side search for larger datasets
+  // This complements the client-side filtering above
+  
+  /**
+   * Perform server-side AJAX search
+   * Use this for database-level searching when dealing with large user datasets
+   */
+  function serverSearchUsers() {
+    const searchQuery = $('#userSearchInput').val().trim();
+    const roleFilter = $('#roleFilterSelect').val();
+    
+    // Show loading indicator
+    $('#usersTable tbody').html(
+      '<tr><td colspan="4" class="text-center py-4">' +
+      '<i class="fa fa-spinner fa-spin me-2"></i>Searching...</td></tr>'
+    );
+    
+    $.ajax({
+      url: '<?= base_url('admin/users/search') ?>',
+      type: 'GET',
+      data: {
+        search: searchQuery,
+        role: roleFilter
+      },
+      dataType: 'json',
+      success: function(response) {
+        if (response.status === 'success') {
+          // Clear existing rows
+          $('#usersTable tbody').empty();
+          
+          if (response.users && response.users.length > 0) {
+            // Rebuild table with search results
+            response.users.forEach(function(user) {
+              const badgeClass = user.role === 'admin' ? 'bg-danger' : 
+                                (user.role === 'teacher' ? 'bg-warning text-dark' : 'bg-info');
+              
+              const row = `
+                <tr data-user-id="${user.id}" 
+                    data-user-name="${user.name.toLowerCase()}" 
+                    data-user-email="${user.email.toLowerCase()}" 
+                    data-user-role="${user.role.toLowerCase()}" 
+                    class="user-row">
+                  <td class="user-name">${escapeHtml(user.name)}</td>
+                  <td class="user-email">${escapeHtml(user.email)}</td>
+                  <td class="user-role">
+                    <span class="badge ${badgeClass}">${capitalizeFirst(user.role)}</span>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary edit-user-btn" 
+                            data-id="${user.id}" 
+                            data-name="${escapeHtml(user.name)}" 
+                            data-email="${escapeHtml(user.email)}" 
+                            data-role="${user.role}">
+                      <i class="fa fa-edit"></i>
+                    </button>
+                    ${user.role !== 'admin' ? 
+                      `<button class="btn btn-sm btn-outline-danger delete-user-btn" 
+                               data-id="${user.id}" 
+                               data-name="${escapeHtml(user.name)}">
+                        <i class="fa fa-trash"></i>
+                      </button>` : ''}
+                  </td>
+                </tr>
+              `;
+              $('#usersTable tbody').append(row);
+            });
+            
+            // Update count
+            $('#userCountDisplay').text(`Showing ${response.count} users`);
+          } else {
+            // No results
+            $('#usersTable tbody').html(
+              '<tr><td colspan="4" class="text-center text-muted py-4">' +
+              '<i class="fa fa-search me-2"></i>No users found matching your criteria</td></tr>'
+            );
+            $('#userCountDisplay').text('Showing 0 users');
+          }
+        } else {
+          alert('Search failed: ' + (response.message || 'Unknown error'));
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error('AJAX search error:', error);
+        $('#usersTable tbody').html(
+          '<tr><td colspan="4" class="text-center text-danger py-4">' +
+          '<i class="fa fa-exclamation-triangle me-2"></i>Search failed. Please try again.</td></tr>'
+        );
+      }
+    });
+  }
+  
+  // Helper functions for HTML escaping and formatting
+  function escapeHtml(text) {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+  }
+  
+  function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+  
+  // Optional: Uncomment to enable automatic server-side search on Enter key
+  // $('#userSearchInput').on('keypress', function(e) {
+  //   if (e.which === 13) { // Enter key
+  //     e.preventDefault();
+  //     serverSearchUsers();
+  //   }
+  // });
+  
   <?php endif; ?>
   // ========================================
   
@@ -1776,20 +1919,129 @@ $(function() {
         });
     }
 
-    function renderCoursesList(courses) {
+    // ========================================
+    // Course Search and Filter Functionality
+    // ========================================
+    let courseSearchTimeout;
+    let allCoursesData = []; // Store all courses for client-side filtering
+    
+    // Live client-side search for courses (debounced)
+    $('#courseSearchInput').on('keyup', function() {
+        clearTimeout(courseSearchTimeout);
+        courseSearchTimeout = setTimeout(function() {
+            filterCourses();
+        }, 300); // 300ms debounce delay
+    });
+    
+    // Semester filter dropdown
+    $('#semesterFilterSelect').on('change', function() {
+        filterCourses();
+    });
+    
+    // Client-side filter courses based on search and semester selection
+    function filterCourses() {
+        const searchTerm = $('#courseSearchInput').val().toLowerCase().trim();
+        const selectedSemester = $('#semesterFilterSelect').val();
+        let visibleCount = 0;
+        
+        // Filter the courses data
+        const filteredCourses = allCoursesData.filter(function(course) {
+            const courseCode = (course.course_code || '').toLowerCase();
+            const courseName = (course.course_name || '').toLowerCase();
+            const courseSemester = course.semester || '';
+            
+            // Check if matches search term
+            const matchesSearch = searchTerm === '' || 
+                                 courseCode.includes(searchTerm) || 
+                                 courseName.includes(searchTerm);
+            
+            // Check if matches semester filter
+            const matchesSemester = selectedSemester === '' || courseSemester === selectedSemester;
+            
+            return matchesSearch && matchesSemester;
+        });
+        
+        // Re-render the table with filtered courses
+        renderCoursesList(filteredCourses, true);
+        
+        // Update count display
+        $('#courseCountDisplay').text(`Showing ${filteredCourses.length} of ${allCoursesData.length} courses`);
+    }
+    
+    // Optional: Server-side AJAX search (for large datasets)
+    function serverSearchCourses() {
+        const searchQuery = $('#courseSearchInput').val().trim();
+        const semesterFilter = $('#semesterFilterSelect').val();
+        
+        // Show loading indicator
+        $('#coursesListContainer').html(
+            '<div class="text-center py-4">' +
+            '<div class="spinner-border spinner-border-sm" role="status">' +
+            '<span class="visually-hidden">Searching...</span></div>' +
+            '<p class="text-muted mt-2">Searching courses...</p></div>'
+        );
+        
+        $.ajax({
+            url: '<?= base_url('admin/courses/search') ?>',
+            type: 'GET',
+            data: {
+                search: searchQuery,
+                semester: semesterFilter
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    allCoursesData = response.courses; // Update stored data
+                    renderCoursesList(response.courses, false);
+                    $('#courseCountDisplay').text(`Showing ${response.count} courses`);
+                } else {
+                    $('#coursesListContainer').html(
+                        '<div class="alert alert-danger">' +
+                        '<i class="fas fa-exclamation-circle me-2"></i>' + 
+                        (response.message || 'Search failed') + '</div>'
+                    );
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('AJAX search error:', error);
+                $('#coursesListContainer').html(
+                    '<div class="alert alert-danger">' +
+                    '<i class="fas fa-exclamation-triangle me-2"></i>Search failed. Please try again.</div>'
+                );
+            }
+        });
+    }
+
+    function renderCoursesList(courses, isFiltered) {
         if (!courses || courses.length === 0) {
-            $('#coursesListContainer').html('<div class="text-muted text-center py-3">No courses created yet</div>');
+            if (isFiltered) {
+                $('#coursesListContainer').html(
+                    '<div class="text-muted text-center py-3">' +
+                    '<i class="fa fa-search me-2"></i>No courses found matching your criteria</div>'
+                );
+            } else {
+                $('#coursesListContainer').html('<div class="text-muted text-center py-3">No courses created yet</div>');
+            }
             return;
         }
+        
+        // Store all courses data for client-side filtering (only if not already filtered)
+        if (!isFiltered) {
+            allCoursesData = courses;
+            $('#courseCountDisplay').text(`Showing ${courses.length} courses`);
+        }
 
-        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>' +
+        let html = '<div class="table-responsive"><table class="table table-hover" id="coursesTable"><thead><tr>' +
             '<th>Code</th><th>Name</th><th>Units</th><th>Semester</th><th>Teacher</th><th>Actions</th></tr></thead><tbody>';
         
         courses.forEach(function(course) {
             const teacherName = course.teacher_name || '<span class="text-muted">Not assigned</span>';
             const units = course.units || '-';
             const semester = course.semester || '<span class="text-muted">Not set</span>';
-            html += `<tr>
+            html += `<tr class="course-row" 
+                        data-course-code="${escapeHtml(course.course_code).toLowerCase()}" 
+                        data-course-name="${escapeHtml(course.course_name).toLowerCase()}" 
+                        data-semester="${escapeHtml(course.semester || '')}">
                 <td><strong>${escapeHtml(course.course_code)}</strong></td>
                 <td>${escapeHtml(course.course_name)}</td>
                 <td>${units}</td>

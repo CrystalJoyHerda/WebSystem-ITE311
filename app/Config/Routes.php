@@ -51,6 +51,9 @@ $routes->group('admin', ['filter' => 'roleauth'], function($routes){
     $routes->post('addUser', 'Admin::addUser');
     $routes->post('updateUser', 'Admin::updateUser');
     $routes->post('deleteUser', 'Admin::deleteUser');
+    // User search endpoint (supports both GET and POST for AJAX)
+    $routes->get('users/search', 'Admin::searchUsers');
+    $routes->post('users/search', 'Admin::searchUsers');
     // Manage inactive users
     $routes->get('aboutUsers', 'Admin::aboutUsers');
     $routes->post('activateUser', 'Admin::activateUser');
@@ -59,6 +62,9 @@ $routes->group('admin', ['filter' => 'roleauth'], function($routes){
     $routes->post('courses/update', 'Admin::updateCourse');
     $routes->post('courses/assign', 'Admin::assignTeacher');
     $routes->get('courses/list', 'Admin::getCourses');
+    // Course search endpoint (supports both GET and POST for AJAX)
+    $routes->get('courses/search', 'Admin::searchCourses');
+    $routes->post('courses/search', 'Admin::searchCourses');
     $routes->get('teachers/list', 'Admin::getTeachers');
     // Student enrollment routes
     $routes->post('enroll/auto', 'Admin::autoEnroll');

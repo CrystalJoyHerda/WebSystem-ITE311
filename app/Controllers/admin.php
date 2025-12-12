@@ -231,6 +231,59 @@ class Admin extends BaseController
     }
 
     /**
+     * Search users with filters (AJAX endpoint for server-side search)
+     * Supports: search query (name/email), role filter
+     */
+    public function searchUsers()
+    {
+        // Only admins can search users
+        if (!session()->get('isLoggedIn') || session()->get('role') !== 'admin') {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+            }
+            return redirect()->to(base_url('login'));
+        }
+
+        $db = \Config\Database::connect();
+        $builder = $db->table('users');
+
+        // Get search parameters
+        $searchQuery = $this->request->getGet('search') ?? $this->request->getPost('search') ?? '';
+        $roleFilter = $this->request->getGet('role') ?? $this->request->getPost('role') ?? '';
+
+        // Only show active users
+        $builder->where('status', 'active');
+
+        // Apply search query (name or email)
+        if (!empty($searchQuery)) {
+            $builder->groupStart()
+                    ->like('name', $searchQuery)
+                    ->orLike('email', $searchQuery)
+                    ->groupEnd();
+        }
+
+        // Apply role filter
+        if (!empty($roleFilter)) {
+            $builder->where('role', $roleFilter);
+        }
+
+        // Get results
+        $users = $builder->orderBy('name', 'ASC')->get()->getResultArray();
+
+        // If AJAX request, return JSON
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 'success',
+                'users' => $users,
+                'count' => count($users)
+            ]);
+        }
+
+        // Otherwise return HTML (for non-AJAX fallback)
+        return view('auth/dashboard', ['users' => $users]);
+    }
+
+    /**
      * Show inactive users (About Users page)
      */
     public function aboutUsers()
@@ -539,6 +592,84 @@ class Admin extends BaseController
                 'status' => 'error',
                 'message' => 'Failed to load courses: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    /**
+     * Search courses with filters (AJAX endpoint for server-side search)
+     * Supports: search query (course code/name), semester filter
+     */
+    public function searchCourses()
+    {
+        // Only admins can search courses
+        if (!session()->get('isLoggedIn') || session()->get('role') !== 'admin') {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+            }
+            return redirect()->to(base_url('login'));
+        }
+
+        try {
+            $db = \Config\Database::connect();
+            
+            // Check if units column exists
+            $fields = $db->getFieldNames('courses');
+            $hasUnits = in_array('units', $fields);
+            
+            // Get search parameters
+            $searchQuery = $this->request->getGet('search') ?? $this->request->getPost('search') ?? '';
+            $semesterFilter = $this->request->getGet('semester') ?? $this->request->getPost('semester') ?? '';
+
+            // Build query
+            $builder = $db->table('courses');
+            
+            if ($hasUnits) {
+                $builder->select('courses.id, courses.subject_code as course_code, courses.subject_name as course_name, courses.description, courses.units, courses.semester, courses.instructor_id, users.name as teacher_name, courses.created_at');
+            } else {
+                $builder->select('courses.id, courses.subject_code as course_code, courses.subject_name as course_name, courses.description, courses.semester, courses.instructor_id, users.name as teacher_name, courses.created_at');
+            }
+            
+            $builder->join('users', 'users.id = courses.instructor_id', 'left');
+
+            // Apply search query (course code or name)
+            if (!empty($searchQuery)) {
+                $builder->groupStart()
+                        ->like('courses.subject_code', $searchQuery)
+                        ->orLike('courses.subject_name', $searchQuery)
+                        ->groupEnd();
+            }
+
+            // Apply semester filter
+            if (!empty($semesterFilter)) {
+                $builder->where('courses.semester', $semesterFilter);
+            }
+
+            // Get results
+            $courses = $builder->orderBy('courses.created_at', 'DESC')->get()->getResultArray();
+
+            // If AJAX request, return JSON
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON([
+                    'status' => 'success',
+                    'courses' => $courses,
+                    'count' => count($courses)
+                ]);
+            }
+
+            // Otherwise return full response (for non-AJAX fallback)
+            return $this->response->setJSON([
+                'status' => 'success',
+                'courses' => $courses
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Failed to search courses: ' . $e->getMessage());
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'Search failed: ' . $e->getMessage()
+                ]);
+            }
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Search failed']);
         }
     }
 
