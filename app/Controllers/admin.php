@@ -867,6 +867,167 @@ class Admin extends BaseController
     }
 
     /**
+     * Bulk enroll multiple students into a single course
+     */
+    public function bulkEnrollStudents()
+    {
+        if (!$this->request->is('post')) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Invalid request method']);
+        }
+
+        // Only admins can bulk enroll students
+        if (!session()->get('isLoggedIn') || session()->get('role') !== 'admin') {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+        }
+
+        $enrollmentModel = new \App\Models\EnrollmentModel();
+        $notificationModel = new \App\Models\NotificationModel();
+        $courseModel = new \App\Models\CourseModel();
+        $db = \Config\Database::connect();
+
+        $courseId = $this->request->getPost('course_id');
+        $studentIds = $this->request->getPost('student_ids');
+
+        // Validation
+        if (empty($courseId)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Course ID is required.'
+            ]);
+        }
+
+        if (empty($studentIds) || !is_array($studentIds)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Please select at least one student.'
+            ]);
+        }
+
+        try {
+            // Get course details
+            $course = $courseModel->find($courseId);
+            if (!$course) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'Course not found.'
+                ]);
+            }
+
+            $courseName = $course['subject_name'] ?? $course['course_name'] ?? 'a course';
+            $instructorId = $course['instructor_id'] ?? null;
+
+            $successEnrollments = [];
+            $failedEnrollments = [];
+
+            foreach ($studentIds as $studentId) {
+                // Check if student exists
+                $student = $db->table('users')
+                    ->where('id', $studentId)
+                    ->where('role', 'student')
+                    ->where('status', 'active')
+                    ->get()
+                    ->getRowArray();
+
+                if (!$student) {
+                    $failedEnrollments[] = [
+                        'student' => 'Unknown Student (ID: ' . $studentId . ')',
+                        'reason' => 'Student not found or inactive'
+                    ];
+                    continue;
+                }
+
+                $studentName = $student['name'];
+
+                // Check enrollment status using helper method
+                $existingEnrollment = $enrollmentModel->getEnrollmentStatus($studentId, $courseId);
+
+                if ($existingEnrollment) {
+                    // Student has an existing enrollment record
+                    $currentStatus = $existingEnrollment['status'];
+                    
+                    if ($currentStatus === 'enrolled') {
+                        $failedEnrollments[] = [
+                            'student' => $studentName,
+                            'reason' => 'Already enrolled in this course'
+                        ];
+                    } elseif ($currentStatus === 'pending') {
+                        $failedEnrollments[] = [
+                            'student' => $studentName,
+                            'reason' => 'Has a pending enrollment request'
+                        ];
+                    } elseif ($currentStatus === 'rejected') {
+                        $failedEnrollments[] = [
+                            'student' => $studentName,
+                            'reason' => 'Previously rejected from this course'
+                        ];
+                    } elseif ($currentStatus === 'assigned') {
+                        $failedEnrollments[] = [
+                            'student' => $studentName,
+                            'reason' => 'Already assigned to this course (awaiting student request)'
+                        ];
+                    } else {
+                        $failedEnrollments[] = [
+                            'student' => $studentName,
+                            'reason' => 'Has existing enrollment record (status: ' . $currentStatus . ')'
+                        ];
+                    }
+                    continue;
+                }
+
+                // No existing enrollment - proceed with enrollment
+                $enrollmentModel->insert([
+                    'user_id' => $studentId,
+                    'course_id' => $courseId,
+                    'status' => 'enrolled',
+                    'enrollment_date' => date('Y-m-d H:i:s'),
+                    'approved_by' => session()->get('id') ?? session()->get('userID')
+                ]);
+
+                // Notify student
+                $notificationModel->insert([
+                    'user_id' => $studentId,
+                    'type' => 'enrollment',
+                    'message' => 'You have been enrolled in: ' . $courseName,
+                    'is_read' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+
+                $successEnrollments[] = $studentName;
+            }
+
+            // Notify teacher if students were enrolled
+            $enrolledCount = count($successEnrollments);
+            if ($enrolledCount > 0 && $instructorId) {
+                $notificationModel->insert([
+                    'user_id' => $instructorId,
+                    'type' => 'student_enrollment',
+                    'message' => $enrolledCount . ' student(s) have been enrolled in: ' . $courseName,
+                    'is_read' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+
+            // Build response with detailed information
+            return $this->response->setJSON([
+                'status' => 'success',
+                'enrolled_count' => $enrolledCount,
+                'failed_count' => count($failedEnrollments),
+                'success_enrollments' => $successEnrollments,
+                'failed_enrollments' => $failedEnrollments
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Failed to bulk enroll students: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to enroll students: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Assign course to student (student must request enrollment)
      * Creates student if email doesn't exist
      */

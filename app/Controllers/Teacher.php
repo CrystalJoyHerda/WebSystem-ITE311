@@ -6,6 +6,10 @@ use App\Models\CourseModel;
 use App\Models\LessonModel;
 use App\Models\EnrollmentModel;
 use App\Models\NotificationModel;
+use App\Models\QuizModel;
+use App\Models\QuizSubmissionModel;
+use App\Models\QuizAnswerModel;
+use App\Models\QuizQuestionModel;
 
 class Teacher extends BaseController
 {
@@ -346,6 +350,292 @@ class Teacher extends BaseController
         } catch (\Exception $e) {
             log_message('error', 'Reject enrollment failed: ' . $e->getMessage());
             return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to reject enrollment']);
+        }
+    }
+
+    /**
+     * Get quizzes for a course with stats (updated)
+     */
+    public function getQuizzes($courseId)
+    {
+        $session = session();
+        $teacherId = $session->get('userID');
+        
+        if (!$teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        // Verify teacher owns this course
+        $course = $this->courseModel->find($courseId);
+        
+        if (!$course || $course['instructor_id'] != $teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Access denied'])->setStatusCode(403);
+        }
+
+        $quizModel = new QuizModel();
+        $quizzes = $quizModel->getQuizWithStats($courseId);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'quizzes' => $quizzes
+        ]);
+    }
+
+    /**
+     * Create a new quiz with multiple questions
+     */
+    public function createQuiz()
+    {
+        $session = session();
+        $teacherId = $session->get('userID');
+        
+        if (!$teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $quizModel = new QuizModel();
+        $quizQuestionModel = new QuizQuestionModel();
+        $notificationModel = new NotificationModel();
+
+        // Get JSON data
+        $jsonData = $this->request->getJSON(true); // true = return as array
+        $courseId = $jsonData['course_id'] ?? null;
+        $title = $jsonData['title'] ?? null;
+        $description = $jsonData['description'] ?? null;
+        $questions = $jsonData['questions'] ?? []; // Array of questions
+
+        // Verify teacher owns this course
+        $course = $this->courseModel->find($courseId);
+        
+        if (!$course || $course['instructor_id'] != $teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Access denied'])->setStatusCode(403);
+        }
+
+        // Validate questions array
+        if (empty($questions) || !is_array($questions)) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'At least one question is required']);
+        }
+
+        // Prepare quiz data (header only)
+        $quizData = [
+            'course_id' => $courseId,
+            'teacher_id' => $teacherId,
+            'lesson_id' => null,
+            'title' => $title,
+            'description' => $description
+        ];
+
+        try {
+            $quizId = $quizModel->createQuiz($quizData);
+
+            if ($quizId) {
+                // Prepare questions for batch insert
+                $questionsData = [];
+                foreach ($questions as $index => $q) {
+                    $questionData = [
+                        'quiz_id' => $quizId,
+                        'question' => $q['question'],
+                        'question_type' => $q['question_type'],
+                        'points' => $q['points'],
+                        'question_order' => $index
+                    ];
+
+                    // Add MCQ-specific fields
+                    if ($q['question_type'] === 'multiple_choice') {
+                        if (empty($q['option_a']) || empty($q['option_b']) || empty($q['option_c']) || empty($q['option_d']) || empty($q['correct_answer'])) {
+                            // Rollback quiz creation
+                            $quizModel->delete($quizId);
+                            return $this->response->setJSON(['status' => 'error', 'message' => 'Multiple choice questions require all 4 options and correct answer']);
+                        }
+                        $questionData['option_a'] = $q['option_a'];
+                        $questionData['option_b'] = $q['option_b'];
+                        $questionData['option_c'] = $q['option_c'];
+                        $questionData['option_d'] = $q['option_d'];
+                        $questionData['correct_answer'] = $q['correct_answer'];
+                    } else if ($q['question_type'] === 'true_false') {
+                        // True/False questions have fixed options
+                        if (empty($q['correct_answer']) || !in_array($q['correct_answer'], ['A', 'B'])) {
+                            $quizModel->delete($quizId);
+                            return $this->response->setJSON(['status' => 'error', 'message' => 'True/False questions require correct answer (A for True or B for False)']);
+                        }
+                        $questionData['option_a'] = 'True';
+                        $questionData['option_b'] = 'False';
+                        $questionData['option_c'] = null;
+                        $questionData['option_d'] = null;
+                        $questionData['correct_answer'] = $q['correct_answer'];
+                    } else if ($q['question_type'] === 'sentence') {
+                        // For sentence type, correct_answer is the expected answer (optional for teacher reference)
+                        $questionData['correct_answer'] = $q['correct_answer'] ?? '';
+                    }
+
+                    $questionsData[] = $questionData;
+                }
+
+                // Save all questions
+                $quizQuestionModel->saveQuestions($questionsData);
+
+                // Notify all enrolled students
+                $students = $this->enrollmentModel->getEnrolledStudents($courseId);
+                
+                foreach ($students as $student) {
+                    $notificationModel->createNotification([
+                        'user_id' => $student['user_id'],
+                        'message' => 'New quiz "' . $title . '" has been created in ' . $course['name'],
+                        'type' => 'quiz'
+                    ]);
+                }
+
+                return $this->response->setJSON([
+                    'status' => 'success',
+                    'message' => 'Quiz created successfully',
+                    'quiz_id' => $quizId
+                ]);
+            } else {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to create quiz']);
+            }
+
+        } catch (\Exception $e) {
+            log_message('error', 'Create quiz failed: ' . $e->getMessage());
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to create quiz: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Delete a quiz
+     */
+    public function deleteQuiz($quizId)
+    {
+        $session = session();
+        $teacherId = $session->get('userID');
+        
+        if (!$teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $quizModel = new QuizModel();
+        $quiz = $quizModel->find($quizId);
+
+        if (!$quiz) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Quiz not found'])->setStatusCode(404);
+        }
+
+        // Verify teacher owns this quiz
+        if ($quiz['teacher_id'] != $teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Access denied'])->setStatusCode(403);
+        }
+
+        try {
+            if ($quizModel->deleteQuiz($quizId)) {
+                return $this->response->setJSON([
+                    'status' => 'success',
+                    'message' => 'Quiz deleted successfully'
+                ]);
+            } else {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to delete quiz']);
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Delete quiz failed: ' . $e->getMessage());
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to delete quiz']);
+        }
+    }
+
+    /**
+     * Get quiz submissions for a specific quiz with answers
+     */
+    public function getQuizSubmissions($quizId)
+    {
+        $session = session();
+        $teacherId = $session->get('userID');
+        
+        if (!$teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $quizModel = new QuizModel();
+        $quiz = $quizModel->find($quizId);
+
+        if (!$quiz || $quiz['teacher_id'] != $teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Access denied'])->setStatusCode(403);
+        }
+
+        $submissionModel = new QuizSubmissionModel();
+        $quizQuestionModel = new QuizQuestionModel();
+        $quizAnswerModel = new QuizAnswerModel();
+        
+        $submissions = $submissionModel->getQuizSubmissions($quizId);
+        $questions = $quizQuestionModel->getQuizQuestions($quizId);
+        
+        // Attach answers to each submission
+        foreach ($submissions as &$submission) {
+            $submission['answers'] = $quizAnswerModel->getSubmissionAnswers($submission['id']);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'submissions' => $submissions,
+            'questions' => $questions
+        ]);
+    }
+
+    /**
+     * Grade a sentence-type answer
+     */
+    public function gradeAnswer()
+    {
+        $session = session();
+        $teacherId = $session->get('userID');
+        
+        if (!$teacherId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $answerId = $this->request->getPost('answer_id');
+        $pointsEarned = $this->request->getPost('points_earned');
+        $submissionId = $this->request->getPost('submission_id');
+
+        $quizAnswerModel = new QuizAnswerModel();
+        $quizSubmissionModel = new QuizSubmissionModel();
+        $quizQuestionModel = new QuizQuestionModel();
+        $notificationModel = new NotificationModel();
+
+        try {
+            // Update answer with points
+            $quizAnswerModel->update($answerId, [
+                'points_earned' => $pointsEarned,
+                'is_correct' => ($pointsEarned > 0) ? 1 : 0
+            ]);
+
+            // Recalculate submission score
+            $submission = $quizSubmissionModel->find($submissionId);
+            $answers = $quizAnswerModel->getSubmissionAnswers($submissionId);
+            
+            $totalEarned = 0;
+            foreach ($answers as $answer) {
+                $totalEarned += $answer['points_earned'];
+            }
+
+            $totalPoints = $quizQuestionModel->getTotalPoints($submission['quiz_id']);
+            $scorePercentage = ($totalPoints > 0) ? ($totalEarned / $totalPoints) * 100 : 0;
+
+            // Update submission score
+            $quizSubmissionModel->updateScore($submissionId, $scorePercentage, $totalPoints);
+
+            // Notify student
+            $notificationModel->createNotification([
+                'user_id' => $submission['student_id'],
+                'message' => 'Your quiz has been graded. Score: ' . number_format($scorePercentage, 2) . '%',
+                'type' => 'quiz_graded'
+            ]);
+
+            return $this->response->setJSON([
+                'status' => 'success',
+                'message' => 'Answer graded successfully',
+                'new_score' => $scorePercentage
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Grade answer failed: ' . $e->getMessage());
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to grade answer']);
         }
     }
 }

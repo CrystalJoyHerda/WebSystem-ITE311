@@ -580,14 +580,15 @@
             container.html('<div class="text-center py-3"><div class="spinner-border" role="status"></div></div>');
             
             $.ajax({
-                url: baseUrl + 'teacher/course/' + courseId + '/quizzes',
+                url: baseUrl + 'teacher/quizzes/' + courseId,
                 method: 'GET',
                 dataType: 'json',
                 success: function(response) {
                     if (response.status === 'success') {
                         renderQuizzesList(response.quizzes);
                     } else {
-                        container.html('<div class="alert alert-warning">' + (response.message || 'No quizzes created yet.') + '</div>');
+                        const courseId = $('#quizzesModalCourseId').val();
+                        container.html('<div class="alert alert-warning">' + (response.message || 'No quizzes created yet.') + ' <button class="btn btn-sm btn-primary ms-2" onclick="showCreateQuizForm(' + courseId + ')">Create Quiz</button></div>');
                     }
                 },
                 error: function(xhr, status, error) {
@@ -625,12 +626,14 @@
 
         function renderQuizzesList(quizzes) {
             const container = $('#quizzesListContainer');
+            const courseId = $('#quizzesModalCourseId').val();
+            
             if (!quizzes || quizzes.length === 0) {
-                container.html('<div class="alert alert-info">No quizzes created yet. <button class="btn btn-sm btn-primary ms-2" onclick="showCreateQuizForm()">Create Quiz</button></div>');
+                container.html('<div class="alert alert-info">No quizzes created yet. <button class="btn btn-sm btn-primary ms-2" onclick="showCreateQuizForm(' + courseId + ')">Create Quiz</button></div>');
                 return;
             }
 
-            let html = '<div class="mb-3"><button class="btn btn-primary btn-sm" onclick="showCreateQuizForm()"><i class="fas fa-plus me-1"></i>Create New Quiz</button></div>';
+            let html = '<div class="mb-3"><button class="btn btn-primary btn-sm" onclick="showCreateQuizForm(' + courseId + ')"><i class="fas fa-plus me-1"></i>Create New Quiz</button></div>';
             html += '<div class="list-group">';
             
             quizzes.forEach(quiz => {
@@ -648,8 +651,7 @@
                             </small>
                         </div>
                         <div class="btn-group-vertical btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="viewQuiz(${quiz.id})"><i class="fas fa-eye"></i></button>
-                            <button class="btn btn-outline-warning" onclick="editQuiz(${quiz.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-outline-primary" onclick="viewQuizSubmissions(${quiz.id})"><i class="fas fa-eye me-1"></i> View Submissions</button>
                             <button class="btn btn-outline-danger" onclick="deleteQuiz(${quiz.id})"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
@@ -741,23 +743,372 @@
             container.html(html);
         }
 
-        // Placeholder functions for create/edit/delete/view actions
-        function showCreateQuizForm() {
-            alert('Create Quiz form will be implemented here.');
+        // Quiz Functions
+        let questionCounter = 0;
+        
+        function showCreateQuizForm(courseId) {
+            $('#quizzesModal').modal('hide');
+            $('#createQuizCourseId').val(courseId);
+            $('#createQuizForm')[0].reset();
+            $('#questionsContainer').empty();
+            questionCounter = 0;
+            addQuestion(); // Add first question by default
+            $('#createQuizModal').modal('show');
         }
 
-        function viewQuiz(id) {
-            alert('View Quiz ' + id + ' details.');
+        function addQuestion() {
+            questionCounter++;
+            const questionHtml = `
+                <div class="card mb-3 question-item" data-question-index="${questionCounter}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>Question ${questionCounter}</strong>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeQuestion(${questionCounter})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Question Text <span class="text-danger">*</span></label>
+                            <textarea class="form-control question-text" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Question Type <span class="text-danger">*</span></label>
+                                <select class="form-select question-type" onchange="toggleQuestionType(${questionCounter})" required>
+                                    <option value="">-- Select Type --</option>
+                                    <option value="multiple_choice">Multiple Choice</option>
+                                    <option value="true_false">True or False</option>
+                                    <option value="sentence">Sentence Answer</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Points <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control question-points" min="1" value="1" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Multiple Choice Options (hidden by default) -->
+                        <div class="mcq-options" style="display: none;">
+                            <div class="mb-2">
+                                <label class="form-label">Option A <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control option-a">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Option B <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control option-b">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Option C <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control option-c">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Option D <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control option-d">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Correct Answer <span class="text-danger">*</span></label>
+                                <select class="form-select correct-answer-mcq">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">Option A</option>
+                                    <option value="B">Option B</option>
+                                    <option value="C">Option C</option>
+                                    <option value="D">Option D</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- True/False Options (hidden by default) -->
+                        <div class="tf-options" style="display: none;">
+                            <div class="mb-2">
+                                <label class="form-label">Correct Answer <span class="text-danger">*</span></label>
+                                <select class="form-select correct-answer-tf">
+                                    <option value="">-- Select --</option>
+                                    <option value="A">True</option>
+                                    <option value="B">False</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Sentence Answer (hidden by default) -->
+                        <div class="sentence-answer" style="display: none;">
+                            <div class="mb-2">
+                                <label class="form-label">Expected Answer (Optional - for teacher reference)</label>
+                                <textarea class="form-control correct-answer-sentence" rows="2" placeholder="This will not be shown to students"></textarea>
+                                <small class="text-muted">This answer will be graded manually by you after submission.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#questionsContainer').append(questionHtml);
         }
 
-        function editQuiz(id) {
-            alert('Edit Quiz ' + id + ' form will be implemented here.');
+        function removeQuestion(index) {
+            $(`.question-item[data-question-index="${index}"]`).remove();
+        }
+
+        function toggleQuestionType(index) {
+            const $question = $(`.question-item[data-question-index="${index}"]`);
+            const type = $question.find('.question-type').val();
+            
+            if (type === 'multiple_choice') {
+                $question.find('.mcq-options').show();
+                $question.find('.tf-options, .sentence-answer').hide();
+                $question.find('.mcq-options input, .mcq-options select').prop('required', true);
+                $question.find('.tf-options select, .sentence-answer textarea').prop('required', false);
+            } else if (type === 'true_false') {
+                $question.find('.tf-options').show();
+                $question.find('.mcq-options, .sentence-answer').hide();
+                $question.find('.tf-options select').prop('required', true);
+                $question.find('.mcq-options input, .mcq-options select, .sentence-answer textarea').prop('required', false);
+            } else if (type === 'sentence') {
+                $question.find('.sentence-answer').show();
+                $question.find('.mcq-options, .tf-options').hide();
+                $question.find('.mcq-options input, .mcq-options select, .tf-options select').prop('required', false);
+                $question.find('.sentence-answer textarea').prop('required', false);
+            } else {
+                $question.find('.mcq-options, .tf-options, .sentence-answer').hide();
+            }
+        }
+
+        function createQuiz() {
+            const courseId = $('#createQuizCourseId').val();
+            const title = $('#quizTitle').val();
+            const description = $('#quizDescription').val();
+
+            if (!title) {
+                alert('Please enter a quiz title.');
+                return;
+            }
+
+            // Collect all questions
+            const questions = [];
+            let valid = true;
+            
+            $('.question-item').each(function() {
+                const $q = $(this);
+                const questionText = $q.find('.question-text').val();
+                const questionType = $q.find('.question-type').val();
+                const points = $q.find('.question-points').val();
+
+                if (!questionText || !questionType || !points) {
+                    alert('Please fill in all required fields for each question.');
+                    valid = false;
+                    return false;
+                }
+
+                const questionData = {
+                    question: questionText,
+                    question_type: questionType,
+                    points: parseInt(points)
+                };
+
+                if (questionType === 'multiple_choice') {
+                    questionData.option_a = $q.find('.option-a').val();
+                    questionData.option_b = $q.find('.option-b').val();
+                    questionData.option_c = $q.find('.option-c').val();
+                    questionData.option_d = $q.find('.option-d').val();
+                    questionData.correct_answer = $q.find('.correct-answer-mcq').val();
+
+                    if (!questionData.option_a || !questionData.option_b || !questionData.option_c || !questionData.option_d || !questionData.correct_answer) {
+                        alert('Multiple choice questions require all 4 options and a correct answer.');
+                        valid = false;
+                        return false;
+                    }
+                } else if (questionType === 'true_false') {
+                    questionData.correct_answer = $q.find('.correct-answer-tf').val();
+
+                    if (!questionData.correct_answer) {
+                        alert('True/False questions require a correct answer.');
+                        valid = false;
+                        return false;
+                    }
+                } else if (questionType === 'sentence') {
+                    questionData.correct_answer = $q.find('.correct-answer-sentence').val();
+                }
+
+                questions.push(questionData);
+            });
+
+            if (!valid) return;
+            if (questions.length === 0) {
+                alert('Please add at least one question.');
+                return;
+            }
+
+            const data = {
+                course_id: courseId,
+                title: title,
+                description: description,
+                questions: questions
+            };
+
+            $.ajax({
+                url: baseUrl + 'teacher/quiz/create',
+                method: 'POST',
+                data: JSON.stringify(data),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('#createQuizModal').modal('hide');
+                        $('#quizzesModal').modal('show');
+                        loadQuizzes(courseId);
+                        alert(response.message || 'Quiz created successfully!');
+                    } else {
+                        alert(response.message || 'Failed to create quiz.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to create quiz:', xhr, status, error);
+                    alert('Failed to create quiz. Please try again.');
+                }
+            });
+        }
+
+        function viewQuizSubmissions(quizId) {
+            $('#quizzesModal').modal('hide');
+            $('#viewQuizSubmissionsId').val(quizId);
+            $('#viewQuizSubmissionsModal').modal('show');
+            loadQuizSubmissions(quizId);
+        }
+
+        function loadQuizSubmissions(quizId) {
+            const container = $('#quizSubmissionsListContainer');
+            container.html('<div class="text-center py-3"><div class="spinner-border" role="status"></div></div>');
+
+            $.ajax({
+                url: baseUrl + 'teacher/quiz/' + quizId + '/submissions',
+                method: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        renderQuizSubmissionsList(response.submissions, response.questions);
+                    } else {
+                        container.html('<div class="alert alert-warning">' + (response.message || 'No submissions yet.') + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to load submissions:', xhr, status, error);
+                    container.html('<div class="alert alert-danger">Failed to load submissions.</div>');
+                }
+            });
+        }
+
+        function renderQuizSubmissionsList(submissions, questions) {
+            const container = $('#quizSubmissionsListContainer');
+            if (!submissions || submissions.length === 0) {
+                container.html('<div class="alert alert-info">No submissions yet.</div>');
+                return;
+            }
+
+            let html = '';
+            submissions.forEach(sub => {
+                const score = sub.score !== null ? sub.score.toFixed(2) + '%' : 'Pending Grading';
+                const badgeClass = sub.score !== null ? (sub.score >= 75 ? 'bg-success' : 'bg-danger') : 'bg-warning';
+                
+                html += `<div class="card mb-3">
+                    <div class="card-header">
+                        <strong>${escapeHtml(sub.student_name)}</strong>
+                        <span class="badge ${badgeClass} float-end">${score}</span>
+                    </div>
+                    <div class="card-body">`;
+
+                sub.answers.forEach((answer, idx) => {
+                    const question = questions[idx];
+                    html += `<div class="mb-3 border-bottom pb-2">
+                        <p><strong>Q${idx + 1}:</strong> ${escapeHtml(question.question)}</p>
+                        <p><strong>Answer:</strong> ${escapeHtml(answer.student_answer)}</p>`;
+                    
+                    if (question.question_type === 'sentence') {
+                        // Show grading button for sentence type
+                        html += `<button class="btn btn-sm btn-primary" onclick="showGradeModal(${answer.id}, ${sub.id}, '${escapeHtml(answer.student_answer)}', ${question.points})">
+                            <i class="fas fa-edit me-1"></i>Grade (${answer.points_earned || 0}/${question.points} pts)
+                        </button>`;
+                    } else {
+                        // Show if correct for MCQ
+                        const correctBadge = answer.is_correct ? '<span class="badge bg-success">Correct</span>' : '<span class="badge bg-danger">Incorrect</span>';
+                        html += `<p>${correctBadge} - ${answer.points_earned}/${question.points} pts</p>`;
+                    }
+                    html += `</div>`;
+                });
+
+                html += `</div></div>`;
+            });
+
+            container.html(html);
+        }
+
+        function showGradeModal(answerId, submissionId, studentAnswer, maxPoints) {
+            $('#gradeAnswerId').val(answerId);
+            $('#gradeSubmissionId').val(submissionId);
+            $('#gradeMaxPoints').val(maxPoints);
+            $('#studentAnswerText').text(studentAnswer);
+            $('#maxPointsDisplay').text(maxPoints);
+            $('#pointsEarned').attr('max', maxPoints).val(0);
+            $('#gradeSentenceModal').modal('show');
+        }
+
+        function saveGrade() {
+            const answerId = $('#gradeAnswerId').val();
+            const submissionId = $('#gradeSubmissionId').val();
+            const pointsEarned = $('#pointsEarned').val();
+            const maxPoints = $('#gradeMaxPoints').val();
+
+            if (parseInt(pointsEarned) > parseInt(maxPoints)) {
+                alert('Points earned cannot exceed maximum points.');
+                return;
+            }
+
+            $.ajax({
+                url: baseUrl + 'teacher/quiz/grade-answer',
+                method: 'POST',
+                data: {
+                    answer_id: answerId,
+                    submission_id: submissionId,
+                    points_earned: pointsEarned
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('#gradeSentenceModal').modal('hide');
+                        loadQuizSubmissions($('#viewQuizSubmissionsId').val());
+                        alert('Answer graded successfully!');
+                    } else {
+                        alert(response.message || 'Failed to grade answer.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to grade answer:', xhr, status, error);
+                    alert('Failed to grade answer. Please try again.');
+                }
+            });
         }
 
         function deleteQuiz(id) {
-            if (confirm('Are you sure you want to delete this quiz?')) {
-                alert('Delete Quiz ' + id + ' - will be implemented.');
+            if (!confirm('Are you sure you want to delete this quiz? All submissions will also be deleted.')) {
+                return;
             }
+
+            $.ajax({
+                url: baseUrl + 'teacher/quiz/delete/' + id,
+                method: 'POST',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        const courseId = $('#quizzesModalCourseId').val();
+                        loadQuizzes(courseId);
+                        alert(response.message || 'Quiz deleted successfully.');
+                    } else {
+                        alert(response.message || 'Failed to delete quiz.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Failed to delete quiz:', xhr, status, error);
+                    alert('Failed to delete quiz. Please try again.');
+                }
+            });
         }
 
         // Assignment Functions
@@ -1152,6 +1503,97 @@
                     <input type="hidden" id="quizzesModalCourseId">
                     <!-- Quizzes List -->
                     <div id="quizzesListContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Quiz Modal -->
+    <div class="modal fade" id="createQuizModal" tabindex="-1" aria-labelledby="createQuizModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createQuizModalLabel">Create New Quiz</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <form id="createQuizForm">
+                        <input type="hidden" id="createQuizCourseId">
+                        
+                        <div class="mb-3">
+                            <label for="quizTitle" class="form-label">Quiz Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="quizTitle" name="title" required maxlength="200">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="quizDescription" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="quizDescription" name="description" rows="2"></textarea>
+                        </div>
+
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Questions</h6>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addQuestion()">
+                                <i class="fas fa-plus me-1"></i>Add Question
+                            </button>
+                        </div>
+                        
+                        <div id="questionsContainer">
+                            <!-- Questions will be added dynamically here -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createQuiz()">Create Quiz</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Quiz Submissions Modal -->
+    <div class="modal fade" id="viewQuizSubmissionsModal" tabindex="-1" aria-labelledby="viewQuizSubmissionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewQuizSubmissionsModalLabel">Quiz Submissions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="viewQuizSubmissionsId">
+                    <div id="quizSubmissionsListContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grade Sentence Answer Modal -->
+    <div class="modal fade" id="gradeSentenceModal" tabindex="-1" aria-labelledby="gradeSentenceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="gradeSentenceModalLabel">Grade Answer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="gradeAnswerId">
+                    <input type="hidden" id="gradeSubmissionId">
+                    <input type="hidden" id="gradeMaxPoints">
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Student's Answer:</strong></label>
+                        <p id="studentAnswerText" class="border p-2 bg-light"></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="pointsEarned" class="form-label">Points Earned <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="pointsEarned" min="0" required>
+                        <small class="form-text text-muted">Max: <span id="maxPointsDisplay"></span> points</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveGrade()">Save Grade</button>
                 </div>
             </div>
         </div>

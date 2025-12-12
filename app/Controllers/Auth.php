@@ -4,6 +4,11 @@ namespace App\Controllers;
 use CodeIgniter\Controller;
 use CodeIgniter\Database\BaseBuilder;
 use App\Models\MaterialModel;
+use App\Models\QuizModel;
+use App\Models\QuizSubmissionModel;
+use App\Models\QuizAnswerModel;
+use App\Models\QuizQuestionModel;
+use App\Models\NotificationModel;
 
 class Auth extends Controller
 {
@@ -273,5 +278,221 @@ public function dashboard()
 
     return view('auth/dashboard', $data);
 }
+
+    /**
+     * Get quizzes for a course (student view)
+     */
+    public function getCourseQuizzes($courseId)
+    {
+        $session = session();
+        $studentId = $session->get('userID');
+        
+        if (!$studentId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        // Check if student is enrolled in this course
+        $db = \Config\Database::connect();
+        $enrollment = $db->table('enrollments')
+            ->where('course_id', $courseId)
+            ->where('user_id', $studentId)
+            ->where('status', 'enrolled')
+            ->get()
+            ->getRowArray();
+
+        if (!$enrollment) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Not enrolled in this course'])->setStatusCode(403);
+        }
+
+        $quizModel = new QuizModel();
+        $submissionModel = new QuizSubmissionModel();
+        $quizQuestionModel = new QuizQuestionModel();
+        
+        // Get all quizzes for this course with stats
+        $quizzes = $quizModel->getQuizWithStats($courseId);
+
+        // Add submission status for each quiz
+        foreach ($quizzes as &$quiz) {
+            $submission = $submissionModel->getStudentSubmission($quiz['id'], $studentId);
+            $quiz['submitted'] = $submission !== null;
+            $quiz['score'] = $submission['score'] ?? null;
+            $quiz['question_count'] = $quiz['question_count'] ?? 0;
+            $quiz['total_points'] = $quiz['total_points'] ?? 0;
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'quizzes' => $quizzes
+        ]);
+    }
+
+    /**
+     * Get a specific quiz for taking (student view)
+     */
+    public function getQuiz($quizId)
+    {
+        $session = session();
+        $studentId = $session->get('userID');
+        
+        if (!$studentId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $quizModel = new QuizModel();
+        $quiz = $quizModel->find($quizId);
+
+        if (!$quiz) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Quiz not found'])->setStatusCode(404);
+        }
+
+        // Check if student is enrolled in the course
+        $db = \Config\Database::connect();
+        $enrollment = $db->table('enrollments')
+            ->where('course_id', $quiz['course_id'])
+            ->where('user_id', $studentId)
+            ->where('status', 'enrolled')
+            ->get()
+            ->getRowArray();
+
+        if (!$enrollment) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Not enrolled in this course'])->setStatusCode(403);
+        }
+
+        // Check if already submitted
+        $submissionModel = new QuizSubmissionModel();
+        if ($submissionModel->hasSubmitted($quizId, $studentId)) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Quiz already submitted'])->setStatusCode(400);
+        }
+
+        // Get all questions for this quiz
+        $quizQuestionModel = new QuizQuestionModel();
+        $questions = $quizQuestionModel->getQuizQuestions($quizId);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'quiz' => $quiz,
+            'questions' => $questions
+        ]);
+    }
+
+    /**
+     * Submit quiz (student) - handles multiple questions
+     */
+    public function submitQuiz()
+    {
+        $session = session();
+        $studentId = $session->get('userID');
+        
+        if (!$studentId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized'])->setStatusCode(401);
+        }
+
+        $quizId = $this->request->getPost('quiz_id');
+        $answers = $this->request->getPost('answers'); // Array of answers
+
+        $quizModel = new QuizModel();
+        $quiz = $quizModel->find($quizId);
+
+        if (!$quiz) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Quiz not found'])->setStatusCode(404);
+        }
+
+        // Check if already submitted
+        $submissionModel = new QuizSubmissionModel();
+        if ($submissionModel->hasSubmitted($quizId, $studentId)) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Quiz already submitted'])->setStatusCode(400);
+        }
+
+        // Get all questions
+        $quizQuestionModel = new QuizQuestionModel();
+        $questions = $quizQuestionModel->getQuizQuestions($quizId);
+
+        $totalPoints = 0;
+        $totalEarned = 0;
+        $answersToSave = [];
+        $hasSentenceType = false;
+
+        foreach ($questions as $index => $question) {
+            $totalPoints += $question['points'];
+            $studentAnswer = $answers[$question['id']] ?? '';
+            
+            $pointsEarned = 0;
+            $isCorrect = 0;
+
+            // Auto-grade MCQ and True/False, leave sentence type for teacher grading
+            if ($question['question_type'] === 'multiple_choice' || $question['question_type'] === 'true_false') {
+                $isCorrect = ($studentAnswer === $question['correct_answer']) ? 1 : 0;
+                $pointsEarned = $isCorrect ? $question['points'] : 0;
+                $totalEarned += $pointsEarned;
+            } else {
+                // Sentence type - will be graded manually
+                $hasSentenceType = true;
+            }
+
+            $answersToSave[] = [
+                'quiz_id' => $quizId,
+                'question_id' => $question['id'],
+                'question_index' => $index,
+                'student_answer' => $studentAnswer,
+                'is_correct' => $isCorrect,
+                'points_earned' => $pointsEarned
+            ];
+        }
+
+        // Calculate score (only from auto-graded questions if there are sentence types)
+        $scorePercentage = null;
+        if (!$hasSentenceType && $totalPoints > 0) {
+            $scorePercentage = ($totalEarned / $totalPoints) * 100;
+        }
+
+        try {
+            // Create submission
+            $submissionId = $submissionModel->createSubmission([
+                'quiz_id' => $quizId,
+                'student_id' => $studentId,
+                'score' => $scorePercentage,
+                'total_points' => $totalPoints,
+                'submitted_at' => date('Y-m-d H:i:s')
+            ]);
+
+            // Add submission_id to all answers
+            foreach ($answersToSave as &$answer) {
+                $answer['submission_id'] = $submissionId;
+            }
+
+            // Save all answers
+            $answerModel = new QuizAnswerModel();
+            $answerModel->saveAnswers($answersToSave);
+
+            // Notify teacher
+            $notificationModel = new NotificationModel();
+            $student = $this->db->table('users')->where('id', $studentId)->get()->getRowArray();
+            $message = $student['name'] . ' submitted quiz "' . $quiz['title'] . '"';
+            if ($scorePercentage !== null) {
+                $message .= ' - Score: ' . number_format($scorePercentage, 2) . '%';
+            } else {
+                $message .= ' - Requires grading';
+            }
+            
+            $notificationModel->createNotification([
+                'user_id' => $quiz['teacher_id'],
+                'message' => $message,
+                'type' => 'quiz_submission'
+            ]);
+
+            return $this->response->setJSON([
+                'status' => 'success',
+                'message' => $hasSentenceType ? 'Quiz submitted! Your teacher will grade the written answers.' : 'Quiz submitted successfully!',
+                'score' => $scorePercentage,
+                'total_earned' => $totalEarned,
+                'total_points' => $totalPoints,
+                'requires_grading' => $hasSentenceType
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Submit quiz failed: ' . $e->getMessage());
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Failed to submit quiz: ' . $e->getMessage()]);
+        }
+    }
 
 }

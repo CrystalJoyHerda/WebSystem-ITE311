@@ -32,4 +32,16 @@ class EnrollmentModel extends Model
             'subjects_id' => $course_id
         ])->countAllResults() > 0;
     }
+
+    /**
+     * Get enrollment status for a user in a course
+     * Returns the enrollment record with status, or null if not found
+     */
+    public function getEnrollmentStatus($user_id, $course_id)
+    {
+        return $this->where([
+            'user_id' => $user_id,
+            'course_id' => $course_id
+        ])->first();
+    }
 }

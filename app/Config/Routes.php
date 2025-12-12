@@ -42,6 +42,12 @@ $routes->group('teacher', ['filter' => 'roleauth'], function($routes){
     // Enrollment approval routes
     $routes->post('enroll/approve', 'Teacher::approveEnrollment');
     $routes->post('enroll/reject', 'Teacher::rejectEnrollment');
+    // Quiz management routes
+    $routes->get('quizzes/(:num)', 'Teacher::getQuizzes/$1');
+    $routes->post('quiz/create', 'Teacher::createQuiz');
+    $routes->post('quiz/delete/(:num)', 'Teacher::deleteQuiz/$1');
+    $routes->get('quiz/(:num)/submissions', 'Teacher::getQuizSubmissions/$1');
+    $routes->post('quiz/grade-answer', 'Teacher::gradeAnswer');
 });
 
 // Admin specific routes
@@ -69,6 +75,7 @@ $routes->group('admin', ['filter' => 'roleauth'], function($routes){
     // Student enrollment routes
     $routes->post('enroll/auto', 'Admin::autoEnroll');
     $routes->post('enroll/assign', 'Admin::assignCourse');
+    $routes->post('enroll/bulk', 'Admin::bulkEnrollStudents');
     $routes->get('students/list', 'Admin::getStudents');
 });
 
@@ -77,6 +84,13 @@ $routes->get('announcement', 'Announcement::index');
 
 // Course enrollment request (student requests enrollment in assigned course)
 $routes->post('course/request-enrollment', 'Course::requestEnrollment');
+
+// Student quiz routes
+$routes->group('student', ['filter' => 'roleauth'], function($routes){
+    $routes->get('course/(:num)/quizzes', 'Auth::getCourseQuizzes/$1');
+    $routes->get('quiz/(:num)', 'Auth::getQuiz/$1');
+    $routes->post('quiz/submit', 'Auth::submitQuiz');
+});
 
 // Materials routes
 $routes->get('materials/course/(:num)', 'Materials::courseMaterials/$1');

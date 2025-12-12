@@ -702,6 +702,51 @@
                     </div>
                 </div>
 
+                <!-- Bulk Enroll Students Modal -->
+                <div class="modal fade" id="bulkEnrollModal" tabindex="-1" aria-labelledby="bulkEnrollModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="bulkEnrollModalLabel">
+                                    <i class="fas fa-users me-2"></i>Bulk Enroll Students
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="bulkEnrollForm">
+                                    <input type="hidden" id="bulk_course_id" name="course_id">
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Course:</strong></label>
+                                        <p id="bulk_course_name" class="text-muted"></p>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="bulk_student_ids" class="form-label">Select Students *</label>
+                                        <select class="form-select" id="bulk_student_ids" name="student_ids[]" multiple size="10" required>
+                                            <option value="" disabled>Loading students...</option>
+                                        </select>
+                                        <small class="form-text text-muted">
+                                            Hold Ctrl (or Cmd on Mac) to select multiple students
+                                        </small>
+                                    </div>
+                                    <div class="alert alert-info small mb-3">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Note:</strong> Selected students will be immediately enrolled in this course with "enrolled" status.
+                                        They will be able to access course materials and the teacher will be notified.
+                                    </div>
+                                    <div id="bulkEnrollResults"></div>
+                                    <div id="bulkEnrollMessage"></div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-success" id="confirmBulkEnrollBtn">
+                                    <i class="fas fa-check me-1"></i>Enroll Selected Students
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                     <!-- Enroll Students Card -->
                     <div class="col-12">
                         <div class="card admin-card">
@@ -1001,6 +1046,12 @@
                                                                     data-course-id="<?= intval($course['id']) ?>" 
                                                                     data-course-name="<?= htmlspecialchars($course['name'], ENT_QUOTES) ?>">
                                                                 <i class="fas fa-tasks me-1"></i>Assignments
+                                                            </button>
+                                                            <button class="btn btn-outline-warning btn-sm student-quizzes-btn" type="button"
+                                                                    data-bs-toggle="modal" data-bs-target="#studentQuizzesModal"
+                                                                    data-course-id="<?= intval($course['id']) ?>" 
+                                                                    data-course-name="<?= htmlspecialchars($course['name'], ENT_QUOTES) ?>">
+                                                                <i class="fas fa-question-circle me-1"></i>Quizzes
                                                             </button>
                                                             <button class="btn btn-outline-success btn-sm view-materials-btn" type="button"
                                                                     data-course-id="<?= intval($course['id']) ?>" 
@@ -1670,6 +1721,117 @@ $(function() {
         });
     });
 
+    // Load students for bulk enrollment
+    function loadStudentsForBulkEnroll() {
+        $.ajax({
+            url: '<?= base_url('admin/students/list') ?>',
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    const select = $('#bulk_student_ids');
+                    select.html('');
+                    if (response.students && response.students.length > 0) {
+                        response.students.forEach(function(student) {
+                            select.append(`<option value="${student.id}">${escapeHtml(student.name)} (${escapeHtml(student.email)})</option>`);
+                        });
+                    } else {
+                        select.html('<option value="" disabled>No students available</option>');
+                    }
+                } else {
+                    $('#bulk_student_ids').html('<option value="" disabled>Failed to load students</option>');
+                }
+            },
+            error: function() {
+                $('#bulk_student_ids').html('<option value="" disabled>Error loading students</option>');
+            }
+        });
+    }
+
+    // Bulk Enroll button click handler
+    $('#confirmBulkEnrollBtn').on('click', function() {
+        const courseId = $('#bulk_course_id').val();
+        const studentIds = $('#bulk_student_ids').val();
+        
+        if (!studentIds || studentIds.length === 0) {
+            $('#bulkEnrollMessage').html('<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Please select at least one student</div>');
+            return;
+        }
+
+        // Show loading state
+        $('#confirmBulkEnrollBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Enrolling...');
+
+        $.ajax({
+            url: '<?= base_url('admin/enroll/bulk') ?>',
+            method: 'POST',
+            data: { course_id: courseId, student_ids: studentIds },
+            dataType: 'json',
+            success: function(response) {
+                const resultsEl = $('#bulkEnrollResults');
+                const msgEl = $('#bulkEnrollMessage');
+                resultsEl.empty();
+                msgEl.empty();
+                
+                if (response.status === 'success') {
+                    let html = '';
+                    
+                    // Display successfully enrolled students
+                    if (response.success_enrollments && response.success_enrollments.length > 0) {
+                        html += '<div class="alert alert-success">';
+                        html += '<h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Successfully Enrolled (' + response.enrolled_count + ')</h6>';
+                        html += '<ul class="mb-0 small">';
+                        response.success_enrollments.forEach(function(student) {
+                            html += '<li>' + escapeHtml(student) + '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
+                    
+                    // Display failed enrollments with reasons
+                    if (response.failed_enrollments && response.failed_enrollments.length > 0) {
+                        html += '<div class="alert alert-warning">';
+                        html += '<h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Failed to Enroll (' + response.failed_count + ')</h6>';
+                        html += '<ul class="mb-0 small">';
+                        response.failed_enrollments.forEach(function(item) {
+                            html += '<li><strong>' + escapeHtml(item.student) + '</strong> — ' + escapeHtml(item.reason) + '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
+                    
+                    resultsEl.html(html);
+                    
+                    // Auto-close and refresh if all students were enrolled successfully
+                    if (response.enrolled_count > 0 && response.failed_count === 0) {
+                        setTimeout(() => {
+                            $('#bulkEnrollModal').modal('hide');
+                            $('#bulkEnrollForm')[0].reset();
+                            resultsEl.empty();
+                            loadCourses(); // Reload courses list
+                        }, 2500);
+                    } else if (response.enrolled_count > 0) {
+                        // Partial success - show message but don't auto-close
+                        msgEl.html('<div class="alert alert-info small"><i class="fas fa-info-circle me-2"></i>Enrollment completed with some warnings. Review the results above.</div>');
+                    } else {
+                        // No students enrolled
+                        msgEl.html('<div class="alert alert-danger small"><i class="fas fa-times-circle me-2"></i>No students were enrolled. See details above.</div>');
+                    }
+                } else {
+                    msgEl.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + (response.message || 'Enrollment failed') + '</div>');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Failed to enroll students';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                $('#bulkEnrollMessage').html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + errorMsg + '</div>');
+            },
+            complete: function() {
+                // Reset button state
+                $('#confirmBulkEnrollBtn').prop('disabled', false).html('<i class="fas fa-check me-1"></i>Enroll Selected Students');
+            }
+        });
+    });
+
     // Enroll Students Modal - Load courses when modal opens
     $('#enrollStudentsModal').on('show.bs.modal', function() {
         loadCoursesForEnrollment();
@@ -2058,10 +2220,15 @@ $(function() {
                         data-instructor-id="${course.instructor_id || ''}">
                         <i class="fas fa-edit me-1"></i>Edit
                     </button>
-                    <button class="btn btn-sm btn-outline-primary assign-teacher-btn" 
+                    <button class="btn btn-sm btn-outline-primary assign-teacher-btn me-1" 
                         data-course-id="${course.id}" 
                         data-course-name="${escapeHtml(course.course_name)}">
                         <i class="fas fa-user-plus me-1"></i>Assign
+                    </button>
+                    <button class="btn btn-sm btn-outline-success bulk-enroll-btn" 
+                        data-course-id="${course.id}" 
+                        data-course-name="${escapeHtml(course.course_name)}">
+                        <i class="fas fa-users me-1"></i>Bulk Enroll
                     </button>
                 </td>
             </tr>`;
@@ -2098,6 +2265,17 @@ $(function() {
             $('#assign_course_name').text(courseName);
             $('#assignTeacherMessage').html('');
             $('#assignTeacherModal').modal('show');
+        });
+
+        // Attach event handlers to bulk enroll buttons
+        $('.bulk-enroll-btn').on('click', function() {
+            const courseId = $(this).data('course-id');
+            const courseName = $(this).data('course-name');
+            $('#bulk_course_id').val(courseId);
+            $('#bulk_course_name').text(courseName);
+            $('#bulkEnrollMessage').html('');
+            loadStudentsForBulkEnroll();
+            $('#bulkEnrollModal').modal('show');
         });
     }
     <?php endif; ?>
@@ -2500,6 +2678,246 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+    // Student Quiz Functions
+    var quizzesModalEl = document.getElementById('studentQuizzesModal');
+    if (quizzesModalEl) {
+        quizzesModalEl.addEventListener('show.bs.modal', function(event) {
+            var button = event.relatedTarget;
+            if (button) {
+                var courseId = button.getAttribute('data-course-id');
+                var courseName = button.getAttribute('data-course-name');
+                
+                $('#studentQuizzesModalLabel').text('Quizzes - ' + courseName);
+                $('#studentQuizzesCourseId').val(courseId);
+                loadStudentQuizzes(courseId);
+            }
+        });
+    }
+
+    function loadStudentQuizzes(courseId) {
+        const container = $('#studentQuizzesListContainer');
+        container.html('<div class="text-center py-3"><div class="spinner-border" role="status"></div></div>');
+        
+        $.ajax({
+            url: studentBaseUrl + 'course/' + courseId + '/quizzes',
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    renderStudentQuizzesList(response.quizzes);
+                } else {
+                    container.html('<div class="alert alert-warning">' + (response.message || 'No quizzes available yet.') + '</div>');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Failed to load quizzes:', xhr, status, error);
+                container.html('<div class="alert alert-danger">Failed to load quizzes. Please try again.</div>');
+            }
+        });
+    }
+
+    function renderStudentQuizzesList(quizzes) {
+        const container = $('#studentQuizzesListContainer');
+        if (!quizzes || quizzes.length === 0) {
+            container.html('<div class="alert alert-info">No quizzes available yet.</div>');
+            return;
+        }
+
+        let html = '<div class="list-group">';
+        quizzes.forEach(quiz => {
+            const submitted = quiz.submitted;
+            const score = quiz.score !== null ? quiz.score.toFixed(2) + '%' : 'N/A';
+            const badgeClass = submitted ? (quiz.score >= 75 ? 'bg-success' : 'bg-danger') : 'bg-secondary';
+            
+            html += `<div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">${escapeHtml(quiz.title)}</h6>
+                        <p class="mb-1 text-muted small">${escapeHtml(quiz.description || 'No description')}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-award me-1"></i>Points: ${quiz.points}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        ${submitted ? 
+                            `<span class="badge ${badgeClass} mb-2">Score: ${score}</span><br>` : 
+                            `<button class="btn btn-sm btn-primary" onclick="takeQuiz(${quiz.id})">
+                                <i class="fas fa-play me-1"></i>Take Quiz
+                            </button>`
+                        }
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    function takeQuiz(quizId) {
+        $.ajax({
+            url: studentBaseUrl + 'quiz/' + quizId,
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    displayQuiz(response.quiz, response.questions);
+                } else {
+                    alert(response.message || 'Failed to load quiz.');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Failed to load quiz:', xhr, status, error);
+                alert('Failed to load quiz. Please try again.');
+            }
+        });
+    }
+
+    function displayQuiz(quiz, questions) {
+        $('#studentQuizzesModal').modal('hide');
+        $('#takeQuizModalLabel').text(quiz.title);
+        $('#takeQuizId').val(quiz.id);
+        
+        let html = `
+            <div class="mb-3">
+                <p class="text-muted">${escapeHtml(quiz.description || '')}</p>
+            </div>
+            <div class="alert alert-info">
+                <strong>Total Questions:</strong> ${questions.length} | <strong>Total Points:</strong> ${questions.reduce((sum, q) => sum + q.points, 0)}
+            </div>
+        `;
+
+        questions.forEach((question, idx) => {
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <strong>Question ${idx + 1}</strong> (${question.points} point${question.points > 1 ? 's' : ''})
+                    </div>
+                    <div class="card-body">
+                        <h6>${escapeHtml(question.question)}</h6>
+            `;
+
+            if (question.question_type === 'multiple_choice') {
+                html += '<div class="mt-3">';
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="A" required>
+                    <label class="form-check-label">${escapeHtml(question.option_a)}</label>
+                </div>`;
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="B" required>
+                    <label class="form-check-label">${escapeHtml(question.option_b)}</label>
+                </div>`;
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="C" required>
+                    <label class="form-check-label">${escapeHtml(question.option_c)}</label>
+                </div>`;
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="D" required>
+                    <label class="form-check-label">${escapeHtml(question.option_d)}</label>
+                </div>`;
+                html += '</div>';
+            } else if (question.question_type === 'true_false') {
+                html += '<div class="mt-3">';
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="A" required>
+                    <label class="form-check-label">True</label>
+                </div>`;
+                html += `<div class="form-check">
+                    <input class="form-check-input" type="radio" name="answer_${question.id}" value="B" required>
+                    <label class="form-check-label">False</label>
+                </div>`;
+                html += '</div>';
+            } else if (question.question_type === 'sentence') {
+                html += `<div class="mt-3">
+                    <label class="form-label">Your Answer:</label>
+                    <textarea class="form-control sentence-answer" data-question-id="${question.id}" rows="4" required placeholder="Type your answer here..."></textarea>
+                    <small class="text-muted">This answer will be graded manually by your teacher.</small>
+                </div>`;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        $('#quizContent').html(html);
+        $('#takeQuizModal').modal('show');
+    }
+
+    function submitStudentQuiz() {
+        const quizId = $('#takeQuizId').val();
+        const answers = {};
+        let allAnswered = true;
+
+        // Collect multiple choice answers
+        $('input[type="radio"]:checked').each(function() {
+            const name = $(this).attr('name');
+            const questionId = name.replace('answer_', '');
+            answers[questionId] = $(this).val();
+        });
+
+        // Collect sentence answers
+        $('.sentence-answer').each(function() {
+            const questionId = $(this).data('question-id');
+            const answer = $(this).val().trim();
+            
+            if (!answer) {
+                allAnswered = false;
+                return false;
+            }
+            
+            answers[questionId] = answer;
+        });
+
+        // Check if all radio groups have selections
+        const totalQuestions = $('input[type="radio"]').length > 0 ? 
+            new Set($('input[type="radio"]').map(function() { return $(this).attr('name'); }).get()).size : 0;
+        const answeredRadios = $('input[type="radio"]:checked').length;
+        const sentenceCount = $('.sentence-answer').length;
+
+        if (answeredRadios < totalQuestions || Object.keys(answers).length < (totalQuestions + sentenceCount)) {
+            alert('Please answer all questions before submitting.');
+            return;
+        }
+
+        if (!allAnswered) {
+            alert('Please answer all questions before submitting.');
+            return;
+        }
+
+        $.ajax({
+            url: studentBaseUrl + 'quiz/submit',
+            method: 'POST',
+            data: JSON.stringify({
+                quiz_id: quizId,
+                answers: answers
+            }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    let resultMsg = '';
+                    if (response.score !== null) {
+                        resultMsg = `Score: ${response.score.toFixed(2)}%`;
+                    } else {
+                        resultMsg = 'Your quiz has been submitted and is awaiting grading by your teacher.';
+                    }
+                    
+                    alert(response.message + '\n\n' + resultMsg);
+                    $('#takeQuizModal').modal('hide');
+                    $('#studentQuizzesModal').modal('show');
+                    loadStudentQuizzes($('#studentQuizzesCourseId').val());
+                } else {
+                    alert('Error: ' + (response.message || 'Failed to submit quiz.'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Failed to submit quiz:', xhr, status, error);
+                alert('Failed to submit quiz. Please try again.');
+            }
+        });
+    }
+
     // Make all functions globally available
     window.loadStudentAssignments = loadStudentAssignments;
     window.renderStudentAssignmentsList = renderStudentAssignmentsList;
@@ -2507,6 +2925,11 @@ function escapeHtml(text) {
     window.showSubmitForm = showSubmitForm;
     window.submitAssignment = submitAssignment;
     window.escapeHtml = escapeHtml;
+    window.loadStudentQuizzes = loadStudentQuizzes;
+    window.renderStudentQuizzesList = renderStudentQuizzesList;
+    window.takeQuiz = takeQuiz;
+    window.displayQuiz = displayQuiz;
+    window.submitStudentQuiz = submitStudentQuiz;
 });
 </script>
 <script>
@@ -2805,6 +3228,42 @@ $(function(){
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="submitAssignment()">Submit Assignment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Quizzes Modal -->
+<div class="modal fade" id="studentQuizzesModal" tabindex="-1" aria-labelledby="studentQuizzesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="studentQuizzesModalLabel">Quizzes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="studentQuizzesCourseId">
+                <div id="studentQuizzesListContainer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Take Quiz Modal -->
+<div class="modal fade" id="takeQuizModal" tabindex="-1" aria-labelledby="takeQuizModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="takeQuizModalLabel">Take Quiz</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="takeQuizId">
+                <div id="quizContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitQuizBtn" onclick="submitStudentQuiz()">Submit Quiz</button>
             </div>
         </div>
     </div>
